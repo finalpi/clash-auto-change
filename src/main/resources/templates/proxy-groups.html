@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout('策略组配置', ~{::div})}">
+<body>
+    <div>
+        <!-- 全局JavaScript函数 -->
+        <script th:inline="javascript">
+            // 准备编辑模态框的函数
+            function prepareEditModal(button) {
+                console.log('准备编辑模态框');
+                
+                // 获取按钮上的数据
+                const configId = button.getAttribute('data-config-id');
+                const groupName = button.getAttribute('data-group-name');
+                const preferredProxy = button.getAttribute('data-preferred-proxy');
+                const testUrl = button.getAttribute('data-test-url');
+                const timeout = button.getAttribute('data-timeout');
+                const maxDelay = button.getAttribute('data-max-delay');
+                const enabled = button.getAttribute('data-enabled') === 'true';
+                
+                console.log('配置数据:', { configId, groupName, preferredProxy, testUrl, timeout, maxDelay, enabled });
+                
+                // 设置表单的action
+                const form = document.getElementById('editConfigForm');
+                form.action = `/proxy-groups/update/${configId}`;
+                
+                // 填充表单字段
+                document.getElementById('editConfigId').value = configId;
+                
+                const groupSelect = document.getElementById('editGroupName');
+                for (let i = 0; i < groupSelect.options.length; i++) {
+                    if (groupSelect.options[i].value === groupName) {
+                        groupSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+                
+                document.getElementById('editTestUrl').value = testUrl;
+                document.getElementById('editTimeout').value = timeout;
+                document.getElementById('editMaxDelay').value = maxDelay;
+                document.getElementById('editEnabled').checked = enabled;
+                
+                // 加载代理节点
+                setTimeout(() => {
+                    loadProxiesGlobal('edit');
+                    
+                    // 在代理节点加载完成后，设置选中的代理节点
+                    setTimeout(() => {
+                        const proxySelect = document.getElementById('editPreferredProxy');
+                        for (let i = 0; i < proxySelect.options.length; i++) {
+                            if (proxySelect.options[i].value === preferredProxy) {
+                                proxySelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }, 500);
+                }, 100);
+            }
+            
+            // 全局函数，用于内联事件调用
+            function loadProxiesGlobal(mode = 'add') {
+                console.log('全局函数loadProxiesGlobal被调用，模式:', mode);
+                
+                // 根据模式选择不同的DOM元素
+                const prefix = mode === 'edit' ? 'edit' : '';
+                const groupSelect = document.getElementById(prefix + 'GroupName');
+                const proxySelect = document.getElementById(prefix + 'PreferredProxy');
+                const statusDiv = document.getElementById(prefix + 'ProxyLoadingStatus');
+                
+                if (!groupSelect || !proxySelect || !statusDiv) {
+                    console.error('找不到必要的DOM元素');
+                    alert('页面元素加载失败，请刷新页面重试');
+                    return;
+                }
+                
+                const selectedGroup = groupSelect.value;
+                if (!selectedGroup) {
+                    alert('请先选择策略组');
+                    return;
+                }
+                
+                console.log('加载策略组的代理节点:', selectedGroup);
+                proxySelect.innerHTML = '<option value="">-- 加载中... --</option>';
+                statusDiv.textContent = '正在加载代理节点...';
+                
+                const apiUrl = `/api/config/group-proxies/${encodeURIComponent(selectedGroup)}?_=${new Date().getTime()}`;
+                console.log('请求API:', apiUrl);
+                
+                fetch(apiUrl)
+                    .then(response => {
+                        console.log('API响应状态:', response.status);
+                        return response.json();
+                    })
+                    .then(proxies => {
+                        console.log('获取到代理节点:', proxies);
+                        proxySelect.innerHTML = '<option value="">-- 选择优先节点 --</option>';
+                        
+                        if (Array.isArray(proxies) && proxies.length > 0) {
+                            proxies.forEach(proxy => {
+                                const option = document.createElement('option');
+                                option.value = proxy;
+                                option.textContent = proxy;
+                                proxySelect.appendChild(option);
+                            });
+                            statusDiv.textContent = `已加载 ${proxies.length} 个代理节点`;
+                        } else {
+                            statusDiv.textContent = '未找到代理节点';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('获取代理节点出错:', error);
+                        proxySelect.innerHTML = '<option value="">-- 无法获取代理节点 --</option>';
+                        statusDiv.textContent = `错误: ${error.message}`;
+                    });
+            }
+        </script>
+        
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">策略组配置</h1>
+            <div class="btn-toolbar mb-2 mb-md-0">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addConfigModal">
+                    <span data-feather="plus"></span>
+                    添加配置
+                </button>
+            </div>
+        </div>
+
+        <!-- 策略组配置列表 -->
+        <div class="table-responsive">
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>策略组</th>
+                        <th>优先节点</th>
+                        <th>测试URL</th>
+                        <th>超时(ms)</th>
+                        <th>最大延迟(ms)</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:if="${configs.empty}">
+                        <td colspan="8" class="text-center">暂无配置</td>
+                    </tr>
+                    <tr th:each="config : ${configs}">
+                        <td th:text="${config.id}">1</td>
+                        <td th:text="${config.groupName}">Proxy</td>
+                        <td th:text="${config.preferredProxy}">HK01</td>
+                        <td th:text="${config.testUrl}">https://www.gstatic.com/generate_204</td>
+                        <td th:text="${config.timeout}">5000</td>
+                        <td th:text="${config.maxDelay}">500</td>
+                        <td>
+                            <span th:if="${config.enabled}" class="badge bg-success">已启用</span>
+                            <span th:unless="${config.enabled}" class="badge bg-secondary">已禁用</span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-outline-primary" title="编辑" 
+                                        data-bs-toggle="modal" data-bs-target="#editConfigModal" 
+                                        th:data-config-id="${config.id}"
+                                        th:data-group-name="${config.groupName}"
+                                        th:data-preferred-proxy="${config.preferredProxy}"
+                                        th:data-test-url="${config.testUrl}"
+                                        th:data-timeout="${config.timeout}"
+                                        th:data-max-delay="${config.maxDelay}"
+                                        th:data-enabled="${config.enabled}"
+                                        onclick="prepareEditModal(this)">
+                                    <span data-feather="edit"></span>
+                                </button>
+                                <a th:href="@{/proxy-groups/toggle/{id}(id=${config.id})}" class="btn btn-outline-warning" th:title="${config.enabled ? '禁用' : '启用'}">
+                                    <span data-feather="power"></span>
+                                </a>
+                                <a th:href="@{/proxy-groups/delete/{id}(id=${config.id})}" class="btn btn-outline-danger" title="删除" onclick="return confirm('确定要删除此配置吗？')">
+                                    <span data-feather="trash-2"></span>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 添加配置模态框 -->
+        <div class="modal fade" id="addConfigModal" tabindex="-1" aria-labelledby="addConfigModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addConfigModalLabel">添加策略组配置</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form th:action="@{/proxy-groups/add}" method="post" th:object="${newConfig}">
+                            <div class="mb-3">
+                                <label for="groupName" class="form-label">策略组</label>
+                                <select class="form-select" id="groupName" name="groupName" required onchange="loadProxiesGlobal();">
+                                    <option value="">-- 选择策略组 --</option>
+                                    <option th:each="group : ${availableGroups.keySet()}" th:value="${group}" th:text="${group}">Proxy</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="preferredProxy" class="form-label">优先节点</label>
+                                <select class="form-select" id="preferredProxy" name="preferredProxy" required>
+                                    <option value="">-- 请先选择策略组 --</option>
+                                </select>
+                                <div id="proxyLoadingStatus" class="form-text text-info"></div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="testUrl" class="form-label">测试URL</label>
+                                <input type="text" class="form-control" id="testUrl" name="testUrl" value="https://www.gstatic.com/generate_204" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="timeout" class="form-label">超时(毫秒)</label>
+                                <input type="number" class="form-control" id="timeout" name="timeout" value="5000" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="maxDelay" class="form-label">最大可接受延迟(毫秒)</label>
+                                <input type="number" class="form-control" id="maxDelay" name="maxDelay" value="500" required>
+                            </div>
+
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-primary">保存</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 编辑配置模态框 -->
+        <div class="modal fade" id="editConfigModal" tabindex="-1" aria-labelledby="editConfigModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editConfigModalLabel">编辑策略组配置</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editConfigForm" method="post">
+                            <input type="hidden" id="editConfigId" name="id" value="">
+                            
+                            <div class="mb-3">
+                                <label for="editGroupName" class="form-label">策略组</label>
+                                <select class="form-select" id="editGroupName" name="groupName" required onchange="loadProxiesGlobal('edit');">
+                                    <option value="">-- 选择策略组 --</option>
+                                    <option th:each="group : ${availableGroups.keySet()}" th:value="${group}" th:text="${group}">Proxy</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editPreferredProxy" class="form-label">优先节点</label>
+                                <select class="form-select" id="editPreferredProxy" name="preferredProxy" required>
+                                    <option value="">-- 请先选择策略组 --</option>
+                                </select>
+                                <div id="editProxyLoadingStatus" class="form-text text-info"></div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editTestUrl" class="form-label">测试URL</label>
+                                <input type="text" class="form-control" id="editTestUrl" name="testUrl" value="https://www.gstatic.com/generate_204" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editTimeout" class="form-label">超时(毫秒)</label>
+                                <input type="number" class="form-control" id="editTimeout" name="timeout" value="5000" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editMaxDelay" class="form-label">最大可接受延迟(毫秒)</label>
+                                <input type="number" class="form-control" id="editMaxDelay" name="maxDelay" value="500" required>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="editEnabled" name="enabled">
+                                <label class="form-check-label" for="editEnabled">启用</label>
+                            </div>
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-primary">保存</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM加载完成，初始化事件监听...');
+
+            // 策略组选择变化时更新优先节点选项
+            const groupSelect = document.getElementById('groupName');
+            const proxySelect = document.getElementById('preferredProxy');
+            const statusDiv = document.getElementById('proxyLoadingStatus');
+
+            if (!groupSelect) {
+                console.error('找不到策略组选择框元素!');
+                return;
+            }
+
+            console.log('已找到策略组选择框，添加change事件监听...');
+            
+            // 页面加载完成后，检查是否已经有选中的策略组
+            setTimeout(() => {
+                if (groupSelect && groupSelect.value) {
+                    console.log('页面加载完成后发现已有选中的策略组，自动加载代理节点');
+                    loadProxiesGlobal();
+                }
+            }, 500);
+
+            
+            // 定义加载代理节点的函数
+            function loadProxies(selectedGroup) {
+                console.log('开始加载代理节点，选中的策略组:', selectedGroup);
+                
+                if (!selectedGroup) {
+                    console.warn('策略组为空，不进行API调用');
+                    proxySelect.innerHTML = '<option value="">-- 请先选择策略组 --</option>';
+                    statusDiv.textContent = '';
+                    return;
+                }
+
+                proxySelect.innerHTML = '<option value="">-- 加载中... --</option>';
+                statusDiv.textContent = '正在加载代理节点...';
+                statusDiv.className = 'form-text text-info';
+
+                const apiUrl = `/api/config/group-proxies/${encodeURIComponent(selectedGroup)}`;
+                console.log('请求API:', apiUrl);
+                
+                // 添加时间戳避免缓存
+                const timestamp = new Date().getTime();
+                const urlWithCache = `${apiUrl}?_=${timestamp}`;
+                console.log('添加缓存参数后的URL:', urlWithCache);
+
+                fetch(urlWithCache, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                })
+                    .then(response => {
+                        console.log('API响应状态:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(proxies => {
+                        console.log('获取到代理节点:', proxies);
+                        proxySelect.innerHTML = '<option value="">-- 选择优先节点 --</option>';
+
+                        if (!Array.isArray(proxies) || proxies.length === 0) {
+                            console.warn('代理节点列表为空或不是数组');
+                            statusDiv.textContent = '未找到代理节点';
+                            statusDiv.className = 'form-text text-warning';
+                            return;
+                        }
+
+                        proxies.forEach(proxy => {
+                            const option = document.createElement('option');
+                            option.value = proxy;
+                            option.textContent = proxy;
+                            proxySelect.appendChild(option);
+                        });
+
+                        statusDiv.textContent = `已加载 ${proxies.length} 个代理节点`;
+                        statusDiv.className = 'form-text text-success';
+                    })
+                    .catch(error => {
+                        console.error('获取代理节点出错:', error);
+                        proxySelect.innerHTML = '<option value="">-- 无法获取代理节点 --</option>';
+                        statusDiv.textContent = `错误: ${error.message}`;
+                        statusDiv.className = 'form-text text-danger';
+                    });
+            }
+
+            // 绑定策略组变化事件
+            groupSelect.addEventListener('change', function() {
+                const selectedGroup = this.value;
+                console.log('策略组选择变化:', selectedGroup);
+                loadProxies(selectedGroup);
+            });
+            
+            // 模态框打开时触发事件，确保在模态框显示后绑定事件
+            const addConfigModal = document.getElementById('addConfigModal');
+            if (addConfigModal) {
+                addConfigModal.addEventListener('shown.bs.modal', function() {
+                    console.log('模态框已显示');
+                    // 重置选择框
+                    if (groupSelect) groupSelect.selectedIndex = 0;
+                    if (proxySelect) proxySelect.innerHTML = '<option value="">-- 请先选择策略组 --</option>';
+                    if (statusDiv) statusDiv.textContent = '';
+                });
+                
+                // 模态框完全显示后检查
+                addConfigModal.addEventListener('shown.bs.modal', function() {
+                    console.log('模态框完全显示，检查是否需要自动加载代理节点');
+                    setTimeout(() => {
+                        if (groupSelect && groupSelect.value) {
+                            console.log('模态框打开时已有选中的策略组，自动加载代理节点');
+                            loadProxiesGlobal();
+                        }
+                    }, 500);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

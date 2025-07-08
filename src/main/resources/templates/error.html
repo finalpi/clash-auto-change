@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout('错误', ~{::div})}">
+<body>
+    <div>
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">出错了</h1>
+        </div>
+        
+        <div class="alert alert-danger">
+            <h4 class="alert-heading">发生错误!</h4>
+            <p th:text="${message}">错误信息</p>
+            <p th:if="${timestamp}" class="mb-0">
+                <small th:text="${'时间: ' + #dates.format(timestamp, 'yyyy-MM-dd HH:mm:ss')}">时间</small>
+            </p>
+            <p th:if="${status}" class="mb-0">
+                <small th:text="${'状态码: ' + status}">状态码</small>
+            </p>
+        </div>
+        
+        <div class="mt-4">
+            <a href="/" class="btn btn-primary">返回首页</a>
+            <a href="javascript:history.back()" class="btn btn-secondary ml-2">返回上一页</a>
+        </div>
+    </div>
+</body>
+</html> 

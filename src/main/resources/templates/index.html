@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout('首页', ~{::div})}">
+<body>
+    <div>
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Clash Auto Change</h1>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4>系统状态</h4>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Clash API 地址:</strong> <span th:text="${apiConfig.baseUrl}">http://127.0.0.1:9090</span></p>
+                        <p><strong>API 密钥状态:</strong> <span th:text="${apiConfig.secret != null && !apiConfig.secret.isEmpty() ? '已配置' : '未配置'}">未配置</span></p>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/settings" class="btn btn-primary">修改设置</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4>快速操作</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="/proxy-groups" class="btn btn-outline-primary mb-2">管理策略组配置</a>
+                            <a href="/settings" class="btn btn-outline-secondary">系统设置</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>关于 Clash Auto Change</h4>
+                    </div>
+                    <div class="card-body">
+                        <p>Clash Auto Change 是一个自动切换 Clash 代理的工具，它可以：</p>
+                        <ul>
+                            <li>自动测试代理延迟并切换到最快的代理</li>
+                            <li>支持配置优先节点，当优先节点可用时优先使用</li>
+                            <li>使用 SQLite 本地数据库存储配置信息</li>
+                            <li>提供 Web 界面进行配置管理</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  clash-auto-change:
+    build: .
+    container_name: clash-auto-change
+    ports:
+      - "7899:7899"
+    volumes:
+      - ./db:/app/db
+    environment:
+      - CLASH_API_BASE_URL=http://host.docker.internal:9090
+      - CLASH_API_SECRET=your-secret-key
+      - SERVER_PORT=7899
+      - SPRING_DATASOURCE_URL=jdbc:sqlite:/app/db/clash_auto_change.db
+    restart: unless-stopped 
