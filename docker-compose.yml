@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   clash-auto-change:
-    build: .
+    image: finalpi/clash-auto-change:latest
     container_name: clash-auto-change
     ports:
       - "7899:7899"
@@ -12,10 +12,10 @@ services:
       # Clash API 配置
       - CLASH_API_BASE_URL=http://localhost:9090  # Clash API 地址
       - CLASH_API_SECRET=                     # Clash API 密钥
-      
+
       # 应用服务器配置
       - SERVER_PORT=7899                                     # 应用程序端口
-      
+
       # 自动切换配置
       - CLASH_AUTO_CHANGE_CHECK_INTERVAL=5000                # 自动切换节点任务查询间隔（毫秒），默认为5秒
-    restart: unless-stopped 
+    restart: unless-stopped

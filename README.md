@@ -56,7 +56,7 @@
 1. 克隆本仓库：
 
 ```bash
-git clone https://github.com/yourusername/clash-auto-change.git
+git clone https://github.com/finalpi/clash-auto-change.git
 cd clash-auto-change
 ```
 
@@ -108,12 +108,12 @@ docker run -d \
   --name clash-auto-change \
   -p 7899:7899 \
   -v $(pwd)/db:/app/db \
-  -e CLASH_API_BASE_URL=http://host.docker.internal:9090 \
-  -e CLASH_API_SECRET=your-secret-key \
+  -e CLASH_API_BASE_URL=http://localhost:9090 \
+  -e CLASH_API_SECRET= \
   -e SERVER_PORT=7899 \
   -e CLASH_AUTO_CHANGE_CHECK_INTERVAL=5000 \
   --restart unless-stopped \
-  clash-auto-change
+  finalpi/clash-auto-change:latest
 ```
 
 ## 环境变量
@@ -149,39 +149,6 @@ clash.auto-change.check-interval=5000                            # 检查间隔(
 spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:sqlite:db/clash_auto_change.db}  # SQLite数据库文件路径
 ```
 
-## 数据库配置
-
-应用程序使用SQLite数据库存储配置信息。主要数据表包括：
-
-- `proxy_group_config`: 存储策略组配置
-  - `id`: 主键
-  - `group_name`: 策略组名称
-  - `preferred_proxy`: 优先节点名称
-  - `test_url`: 测试URL
-  - `timeout`: 超时时间(毫秒)
-  - `max_delay`: 最大可接受延迟(毫秒)
-  - `enabled`: 是否启用
-
-- `admin_user`: 存储管理员用户信息
-  - `id`: 主键
-  - `username`: 用户名
-  - `password`: 加密密码
-
-## API接口
-
-### Clash API接口
-
-- `GET /api/clash/proxies` - 获取所有代理
-- `GET /api/clash/proxies/{proxyName}/delay?url=xxx&timeout=5000` - 测试代理延迟
-- `PUT /api/clash/proxies/{proxyGroup}` - 为策略组选择代理
-
-### 配置管理接口
-
-- `GET /api/config` - 获取所有策略组配置
-- `GET /api/config/{id}` - 根据ID获取策略组配置
-- `POST /api/config` - 创建或更新策略组配置
-- `DELETE /api/config/{id}` - 删除策略组配置
-
 ## 构建与运行
 
 ```bash
@@ -190,23 +157,6 @@ spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:sqlite:db/clash_auto_change.d
 
 # 运行应用
 java -jar target/clash-auto-change-0.0.1-SNAPSHOT.jar
-```
-
-## 使用示例
-
-### 添加策略组配置
-
-```bash
-curl -X POST http://localhost:8080/api/config \
-  -H "Content-Type: application/json" \
-  -d '{
-    "groupName": "Proxy",
-    "preferredProxy": "HK01",
-    "testUrl": "https://www.gstatic.com/generate_204",
-    "timeout": 5000,
-    "maxDelay": 500,
-    "enabled": true
-  }'
 ```
 
 ## 工作原理

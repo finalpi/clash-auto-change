@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jdk-alpine as build
+FROM openjdk:17-slim as build
 WORKDIR /workspace/app
 
 # 复制 Maven 配置文件
@@ -13,7 +13,7 @@ RUN ./mvnw install -DskipTests
 RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
 
 # 运行阶段
-FROM eclipse-temurin:17-jre-alpine
+FROM openjdk:17-slim
 VOLUME /tmp
 ARG DEPENDENCY=/workspace/app/target/dependency
 
