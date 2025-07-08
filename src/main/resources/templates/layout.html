@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:fragment="layout(title, content)">
+<html xmlns:th="http://www.thymeleaf.org" 
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:fragment="layout(title, content)">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -47,14 +49,34 @@
             background-color: rgba(0, 0, 0, .25);
             box-shadow: inset -1px 0 0 rgba(0, 0, 0, .25);
         }
+        
+        .user-info {
+            color: #fff;
+            margin-right: 15px;
+        }
     </style>
 </head>
 <body>
-    <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
-        <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="#">Clash Auto Change</a>
+    <header th:fragment="header" class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
+        <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="/">Clash Auto Change</a>
         <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+        <div class="d-flex ms-auto">
+            <div class="user-info d-flex align-items-center" sec:authorize="isAuthenticated()">
+                <span class="me-2">欢迎，<span sec:authentication="name"></span></span>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i data-feather="user"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li><a class="dropdown-item" th:href="@{/profile}">个人资料</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" th:href="@{/logout}">退出登录</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </header>
 
     <div class="container-fluid">
@@ -101,6 +123,12 @@
             </main>
         </div>
     </div>
+
+    <footer th:fragment="footer" class="footer mt-auto py-3 bg-light">
+        <div class="container text-center">
+            <span class="text-muted">Clash Auto Change &copy; 2023</span>
+        </div>
+    </footer>
 
     <!-- 引入Bootstrap JS和依赖 -->
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>

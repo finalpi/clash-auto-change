@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人资料 - Clash Auto Change</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .content-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div th:replace="layout :: header"></div>
+    
+    <div class="container mt-4">
+        <div class="content-container">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">个人资料</h5>
+                </div>
+                <div class="card-body">
+                    <div th:if="${error}" class="alert alert-danger" role="alert">
+                        <span th:text="${error}"></span>
+                    </div>
+                    <div th:if="${success}" class="alert alert-success" role="alert">
+                        <span th:text="${success}"></span>
+                    </div>
+                    
+                    <form th:action="@{/profile}" method="post">
+                        <input type="hidden" name="currentUsername" th:value="${username}">
+                        
+                        <div class="mb-3">
+                            <label for="newUsername" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="newUsername" name="newUsername" th:value="${username}" required>
+                            <div class="form-text">修改用户名后需要重新登录</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="currentPassword" class="form-label">当前密码</label>
+                            <input type="password" class="form-control" id="currentPassword" name="currentPassword" required>
+                            <div class="form-text">无论是修改用户名还是密码，都需要输入当前密码</div>
+                        </div>
+                        
+                        <hr>
+                        <h6>修改密码（如不修改请留空）</h6>
+                        
+                        <div class="mb-3">
+                            <label for="newPassword" class="form-label">新密码</label>
+                            <input type="password" class="form-control" id="newPassword" name="newPassword">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="confirmPassword" class="form-label">确认新密码</label>
+                            <input type="password" class="form-control" id="confirmPassword" name="confirmPassword">
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a th:href="@{/}" class="btn btn-secondary">返回</a>
+                            <button type="submit" class="btn btn-primary">保存修改</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div th:replace="layout :: footer"></div>
+</body>
+</html> 

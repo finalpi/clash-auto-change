@@ -29,15 +29,6 @@ public class ClashAutoChangeService {
     @Value("${clash.auto-change.test-url:https://www.gstatic.com/generate_204}")
     private String testUrl;
 
-    @Value("${clash.auto-change.timeout:5000}")
-    private Integer timeout;
-
-    @Value("${clash.auto-change.proxy-group:}")
-    private String proxyGroup;
-
-    @Value("${clash.auto-change.max-delay:500}")
-    private Integer maxDelay;
-
     @Autowired
     public ClashAutoChangeService(ClashApiService clashApiService, ProxyGroupConfigService proxyGroupConfigService) {
         this.clashApiService = clashApiService;
@@ -80,7 +71,7 @@ public class ClashAutoChangeService {
             if (groupInfo.isEmpty()) {
                 return;
             }
-            
+
             // 获取当前选中的代理
             String currentProxy = (String) groupInfo.get("now");
             if (currentProxy == null) {
@@ -89,7 +80,7 @@ public class ClashAutoChangeService {
 
             // 一次性测试所有节点的延迟
             Map<String, Integer> delayResults = clashApiService.testGroupDelay(groupName, testUrlToUse, timeout);
-            
+
             if (delayResults.isEmpty()) {
                 return;
             }
@@ -104,11 +95,11 @@ public class ClashAutoChangeService {
                 }
                 return;
             }
-            
+
             // 检查当前节点是否可用
             Integer currentDelay = delayResults.get(currentProxy);
             boolean isCurrentProxyAvailable = currentDelay != null && currentDelay <= maxDelay;
-            
+
             // 如果当前节点可用，且优先节点不可用，则不切换
             if (isCurrentProxyAvailable && (preferredDelay == null || preferredDelay > maxDelay)) {
                 return;

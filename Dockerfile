@@ -31,6 +31,10 @@ ENV CLASH_API_SECRET=
 ENV SERVER_PORT=7899
 ENV SPRING_DATASOURCE_URL=jdbc:sqlite:/app/db/clash_auto_change.db
 
+# 自动切换配置环境变量
+ENV CLASH_AUTO_CHANGE_TEST_URL=https://www.gstatic.com/generate_204
+ENV CLASH_AUTO_CHANGE_CHECK_INTERVAL=5000
+
 # 暴露端口
 EXPOSE ${SERVER_PORT}
 
