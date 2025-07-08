@@ -1,15 +1,12 @@
-FROM openjdk:17-slim as build
+FROM maven:3.8-openjdk-17-slim as build
 WORKDIR /workspace/app
 
-# 复制 Maven 配置文件
-COPY mvnw .
-COPY .mvn .mvn
+# 复制项目文件
 COPY pom.xml .
 COPY src src
 
 # 构建应用程序
-RUN chmod +x ./mvnw
-RUN ./mvnw install -DskipTests
+RUN mvn package -DskipTests
 RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
 
 # 运行阶段
