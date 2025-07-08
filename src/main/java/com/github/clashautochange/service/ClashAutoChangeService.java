@@ -53,7 +53,6 @@ public class ClashAutoChangeService {
         // 获取所有已启用的策略组配置
         List<ProxyGroupConfig> enabledConfigs = proxyGroupConfigService.getAllEnabledConfigs();
         if (enabledConfigs.isEmpty()) {
-            log.info("没有启用的策略组配置");
             return;
         }
 
@@ -75,45 +74,33 @@ public class ClashAutoChangeService {
         Integer maxDelay = config.getMaxDelay();
         String testUrlToUse = config.getTestUrl() != null ? config.getTestUrl() : this.testUrl;
 
-        log.info("处理策略组: {}, 优先节点: {}, 最大延迟: {}ms, 测试URL: {}", 
-                groupName, preferredProxy, maxDelay, testUrlToUse);
-
         try {
             // 获取策略组信息
             Map<String, Object> groupInfo = clashApiService.getGroupInfo(groupName);
             if (groupInfo.isEmpty()) {
-                log.error("策略组 {} 不存在或无法获取信息", groupName);
                 return;
             }
             
             // 获取当前选中的代理
             String currentProxy = (String) groupInfo.get("now");
             if (currentProxy == null) {
-                log.error("无法获取策略组 {} 的当前选择", groupName);
                 return;
             }
-            log.info("当前选中的代理: {}", currentProxy);
 
             // 一次性测试所有节点的延迟
-            log.info("开始测试策略组 {} 中所有节点的延迟", groupName);
             Map<String, Integer> delayResults = clashApiService.testGroupDelay(groupName, testUrlToUse, timeout);
             
             if (delayResults.isEmpty()) {
-                log.warn("测试结果为空，所有节点可能都超时");
                 return;
             }
-            
-            log.info("获取到 {} 个节点的延迟结果: {}", delayResults.size(), delayResults);
 
             // 检查优先节点是否可用
             Integer preferredDelay = delayResults.get(preferredProxy);
             if (preferredDelay != null && preferredDelay <= maxDelay) {
                 // 优先节点可用且延迟在可接受范围内
                 if (!preferredProxy.equals(currentProxy)) {
-                    log.info("优先节点 {} 可用，延迟: {}ms，切换到优先节点", preferredProxy, preferredDelay);
+                    log.info("切换代理: {} -> {}, 延迟: {}ms", currentProxy, preferredProxy, preferredDelay);
                     clashApiService.selectProxy(groupName, preferredProxy);
-                } else {
-                    log.info("当前已是优先节点 {} 且可用，延迟: {}ms，无需切换", preferredProxy, preferredDelay);
                 }
                 return;
             }
@@ -122,13 +109,8 @@ public class ClashAutoChangeService {
             Integer currentDelay = delayResults.get(currentProxy);
             boolean isCurrentProxyAvailable = currentDelay != null && currentDelay <= maxDelay;
             
-            // 如果优先节点不可用或延迟过高，查找延迟最低的节点
-            log.info("优先节点 {} 不可用或延迟过高: {}", preferredProxy, 
-                    preferredDelay != null ? preferredDelay + "ms" : "无响应");
-            
             // 如果当前节点可用，且优先节点不可用，则不切换
             if (isCurrentProxyAvailable && (preferredDelay == null || preferredDelay > maxDelay)) {
-                log.info("当前节点 {} 可用(延迟: {}ms)，优先节点不可用，保持当前节点", currentProxy, currentDelay);
                 return;
             }
 
@@ -143,16 +125,12 @@ public class ClashAutoChangeService {
 
                 // 只有当最佳代理不是当前代理时才切换
                 if (!bestProxyName.equals(currentProxy)) {
-                    log.info("切换到延迟最低的代理 {}, 延迟: {}ms", bestProxyName, bestDelay);
+                    log.info("切换代理: {} -> {}, 延迟: {}ms", currentProxy, bestProxyName, bestDelay);
                     clashApiService.selectProxy(groupName, bestProxyName);
-                } else {
-                    log.info("当前代理 {} 已是延迟最低的代理, 延迟: {}ms", currentProxy, bestDelay);
                 }
-            } else {
-                log.warn("没有找到延迟小于 {}ms 的代理", maxDelay);
             }
         } catch (Exception e) {
-            log.error("处理策略组 {} 时出错: {}", groupName, e.getMessage(), e);
+            log.error("处理策略组 {} 时出错: {}", groupName, e.getMessage());
         }
     }
 }

@@ -105,12 +105,9 @@ public class ClashApiService {
      * @return 代理节点列表
      */
     public List<String> getGroupProxies(String groupName) {
-        log.info("获取策略组 '{}' 的代理节点", groupName);
-        
         try {
             HttpEntity<Void> requestEntity = new HttpEntity<>(getHeaders());
             String url = clashApiConfig.getBaseUrl() + "/proxies/" + groupName;
-            log.info("请求URL: {}", url);
             
             ResponseEntity<Map> response = restTemplate.exchange(
                     url,
@@ -121,12 +118,8 @@ public class ClashApiService {
             
             List<String> result = new ArrayList<>();
             if (response.getBody() != null) {
-                log.info("API响应状态码: {}", response.getStatusCode());
-                log.info("API响应内容: {}", response.getBody());
-                
                 if (response.getBody().containsKey("all")) {
                     result = (List<String>) response.getBody().get("all");
-                    log.info("从 'all' 字段获取到 {} 个代理节点", result.size());
                 } 
                 else if (response.getBody().containsKey("proxies")) {
                     List<Map<String, Object>> proxies = (List<Map<String, Object>>) response.getBody().get("proxies");
@@ -136,33 +129,26 @@ public class ClashApiService {
                                 result.add((String) proxy.get("name"));
                             }
                         }
-                        log.info("从 'proxies' 字段获取到 {} 个代理节点", result.size());
                     }
                 } 
                 else if (response.getBody().containsKey("now") && response.getBody().containsKey("all")) {
                     result = (List<String>) response.getBody().get("all");
-                    log.info("从响应的 'all' 字段获取到 {} 个代理节点", result.size());
                 }
                 else {
                     for (Object entryObj : response.getBody().entrySet()) {
                         if (entryObj instanceof Map.Entry) {
                             Map.Entry<?, ?> entry = (Map.Entry<?, ?>) entryObj;
-                            log.info("响应体键值对: {} = {}", entry.getKey(), entry.getValue());
                             if (entry.getKey() instanceof String && entry.getValue() instanceof String) {
                                 result.add((String) entry.getKey());
                             }
                         }
                     }
-                    log.info("从响应体直接解析获取到 {} 个代理节点", result.size());
                 }
-            } else {
-                log.warn("API响应为空");
             }
             
-            log.info("最终返回 {} 个代理节点: {}", result.size(), result);
             return result;
         } catch (Exception e) {
-            log.error("获取策略组代理节点时出错: {}", e.getMessage(), e);
+            log.error("获取策略组代理节点时出错: {}", e.getMessage());
             throw e;
         }
     }
@@ -199,7 +185,6 @@ public class ClashApiService {
      * @param proxyName 代理名称
      */
     public void selectProxy(String proxyGroup, String proxyName) {
-        log.info("为策略组 '{}' 选择代理 '{}'", proxyGroup, proxyName);
         HttpEntity<ClashSelectProxyRequest> requestEntity = new HttpEntity<>(
                 new ClashSelectProxyRequest(proxyName),
                 getHeaders()
@@ -207,7 +192,6 @@ public class ClashApiService {
 
         try {
             String url = clashApiConfig.getBaseUrl() + "/proxies/" + proxyGroup;
-            log.info("请求URL: {}, 请求体: {}", url, new ClashSelectProxyRequest(proxyName));
             
             ResponseEntity<Void> response = restTemplate.exchange(
                     url,
@@ -215,10 +199,8 @@ public class ClashApiService {
                     requestEntity,
                     Void.class
             );
-            
-            log.info("选择代理成功，API响应状态码: {}", response.getStatusCode());
         } catch (Exception e) {
-            log.error("选择代理时出错: {}", e.getMessage(), e);
+            log.error("选择代理时出错: {}", e.getMessage());
             throw e;
         }
     }
@@ -232,7 +214,6 @@ public class ClashApiService {
      * @return 代理名称和延迟的映射
      */
     public Map<String, Integer> testGroupDelay(String groupName, String url, Integer timeout) {
-        log.info("测试策略组 '{}' 中所有代理的延迟", groupName);
         HttpEntity<Void> requestEntity = new HttpEntity<>(getHeaders());
 
         UriComponentsBuilder builder = UriComponentsBuilder
@@ -241,7 +222,6 @@ public class ClashApiService {
                 .queryParam("timeout", timeout);
                 
         String requestUrl = builder.toUriString();
-        log.info("请求URL: {}", requestUrl);
 
         try {
             ResponseEntity<Map> response = restTemplate.exchange(
@@ -251,12 +231,8 @@ public class ClashApiService {
                     Map.class
             );
             
-            log.info("API响应状态码: {}", response.getStatusCode());
-            
             Map<String, Integer> result = new HashMap<>();
             if (response.getBody() != null) {
-                log.info("API响应内容: {}", response.getBody());
-                
                 // 解析响应，提取每个代理的延迟
                 Map<String, Object> responseBody = response.getBody();
                 for (Map.Entry<String, Object> entry : responseBody.entrySet()) {
@@ -266,15 +242,11 @@ public class ClashApiService {
                         result.put(entry.getKey(), ((Number) entry.getValue()).intValue());
                     }
                 }
-                
-                log.info("解析得到 {} 个代理的延迟结果", result.size());
-            } else {
-                log.warn("API响应为空");
             }
 
             return result;
         } catch (Exception e) {
-            log.error("测试策略组代理延迟时出错: {}", e.getMessage(), e);
+            log.error("测试策略组代理延迟时出错: {}", e.getMessage());
             return new HashMap<>();
         }
     }
@@ -286,12 +258,9 @@ public class ClashApiService {
      * @return 策略组信息
      */
     public Map<String, Object> getGroupInfo(String groupName) {
-        log.info("获取策略组 '{}' 的信息", groupName);
-        
         try {
             HttpEntity<Void> requestEntity = new HttpEntity<>(getHeaders());
-            String url = clashApiConfig.getBaseUrl() + "/group/" + groupName;
-            log.info("请求URL: {}", url);
+            String url = clashApiConfig.getBaseUrl() + "/proxies/" + groupName;
             
             ResponseEntity<Map> response = restTemplate.exchange(
                     url,
@@ -301,18 +270,13 @@ public class ClashApiService {
             );
             
             if (response.getBody() != null) {
-                log.info("API响应状态码: {}", response.getStatusCode());
-                log.debug("API响应内容: {}", response.getBody());
-                
                 Map<String, Object> groupInfo = response.getBody();
-                log.info("获取到策略组 '{}' 的信息，当前选中: {}", groupName, groupInfo.get("now"));
                 return groupInfo;
             } else {
-                log.warn("API响应为空");
                 return new HashMap<>();
             }
         } catch (Exception e) {
-            log.error("获取策略组 '{}' 的信息时出错: {}", groupName, e.getMessage(), e);
+            log.error("获取策略组 '{}' 的信息时出错: {}", groupName, e.getMessage());
             return new HashMap<>();
         }
     }
