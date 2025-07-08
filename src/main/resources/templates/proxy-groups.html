@@ -41,7 +41,7 @@
                 
                 // 加载代理节点
                 setTimeout(() => {
-                    loadProxiesGlobal('edit');
+                    loadProxies('edit');
                     
                     // 在代理节点加载完成后，设置选中的代理节点
                     setTimeout(() => {
@@ -56,61 +56,99 @@
                 }, 100);
             }
             
-            // 全局函数，用于内联事件调用
-            function loadProxiesGlobal(mode = 'add') {
-                console.log('全局函数loadProxiesGlobal被调用，模式:', mode);
+            // 全局函数，用于加载代理节点
+            function loadProxies(mode = 'add') {
+                console.log('加载代理节点函数被调用，模式:', mode);
                 
-                // 根据模式选择不同的DOM元素
-                const prefix = mode === 'edit' ? 'edit' : '';
-                const groupSelect = document.getElementById(prefix + 'GroupName');
-                const proxySelect = document.getElementById(prefix + 'PreferredProxy');
-                const statusDiv = document.getElementById(prefix + 'ProxyLoadingStatus');
-                
-                if (!groupSelect || !proxySelect || !statusDiv) {
-                    console.error('找不到必要的DOM元素');
-                    alert('页面元素加载失败，请刷新页面重试');
-                    return;
+                try {
+                    // 根据模式选择不同的DOM元素
+                    const prefix = mode === 'edit' ? 'edit' : '';
+                    console.log('使用前缀:', prefix);
+                    
+                    // 修正ID大小写问题
+                    let groupSelectId, proxySelectId, statusDivId;
+                    
+                    if (prefix === 'edit') {
+                        groupSelectId = 'editGroupName';
+                        proxySelectId = 'editPreferredProxy';
+                        statusDivId = 'editProxyLoadingStatus';
+                    } else {
+                        groupSelectId = 'groupName';
+                        proxySelectId = 'preferredProxy';
+                        statusDivId = 'proxyLoadingStatus';
+                    }
+                    
+                    console.log('尝试获取DOM元素:', groupSelectId, proxySelectId, statusDivId);
+                    
+                    const groupSelect = document.getElementById(groupSelectId);
+                    const proxySelect = document.getElementById(proxySelectId);
+                    const statusDiv = document.getElementById(statusDivId);
+                    
+                    console.log('DOM元素获取结果:', 
+                        groupSelect ? '策略组选择框-已找到' : '策略组选择框-未找到', 
+                        proxySelect ? '代理选择框-已找到' : '代理选择框-未找到', 
+                        statusDiv ? '状态显示区-已找到' : '状态显示区-未找到');
+                    
+                    if (!groupSelect || !proxySelect || !statusDiv) {
+                        console.error('找不到必要的DOM元素', {
+                            groupSelectId,
+                            proxySelectId,
+                            statusDivId,
+                            groupSelectExists: !!groupSelect,
+                            proxySelectExists: !!proxySelect,
+                            statusDivExists: !!statusDiv
+                        });
+                        // 不再弹出alert，避免用户体验不好
+                        return;
+                    }
+                    
+                    const selectedGroup = groupSelect.value;
+                    console.log('选中的策略组:', selectedGroup);
+                    
+                    if (!selectedGroup) {
+                        console.warn('未选择策略组，不加载代理节点');
+                        return;
+                    }
+                    
+                    console.log('加载策略组的代理节点:', selectedGroup);
+                    proxySelect.innerHTML = '<option value="">-- 加载中... --</option>';
+                    statusDiv.textContent = '正在加载代理节点...';
+                    
+                    const apiUrl = `/api/config/group-proxies/${encodeURIComponent(selectedGroup)}?_=${new Date().getTime()}`;
+                    console.log('请求API:', apiUrl);
+                    
+                    fetch(apiUrl)
+                        .then(response => {
+                            console.log('API响应状态:', response.status);
+                            if (!response.ok) {
+                                throw new Error(`API请求失败: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(proxies => {
+                            console.log('获取到代理节点:', proxies);
+                            proxySelect.innerHTML = '<option value="">-- 选择优先节点 --</option>';
+                            
+                            if (Array.isArray(proxies) && proxies.length > 0) {
+                                proxies.forEach(proxy => {
+                                    const option = document.createElement('option');
+                                    option.value = proxy;
+                                    option.textContent = proxy;
+                                    proxySelect.appendChild(option);
+                                });
+                                statusDiv.textContent = `已加载 ${proxies.length} 个代理节点`;
+                            } else {
+                                statusDiv.textContent = '未找到代理节点';
+                            }
+                        })
+                        .catch(error => {
+                            console.error('获取代理节点出错:', error);
+                            proxySelect.innerHTML = '<option value="">-- 无法获取代理节点 --</option>';
+                            statusDiv.textContent = `错误: ${error.message}`;
+                        });
+                } catch (error) {
+                    console.error('loadProxies函数执行出错:', error);
                 }
-                
-                const selectedGroup = groupSelect.value;
-                if (!selectedGroup) {
-                    alert('请先选择策略组');
-                    return;
-                }
-                
-                console.log('加载策略组的代理节点:', selectedGroup);
-                proxySelect.innerHTML = '<option value="">-- 加载中... --</option>';
-                statusDiv.textContent = '正在加载代理节点...';
-                
-                const apiUrl = `/api/config/group-proxies/${encodeURIComponent(selectedGroup)}?_=${new Date().getTime()}`;
-                console.log('请求API:', apiUrl);
-                
-                fetch(apiUrl)
-                    .then(response => {
-                        console.log('API响应状态:', response.status);
-                        return response.json();
-                    })
-                    .then(proxies => {
-                        console.log('获取到代理节点:', proxies);
-                        proxySelect.innerHTML = '<option value="">-- 选择优先节点 --</option>';
-                        
-                        if (Array.isArray(proxies) && proxies.length > 0) {
-                            proxies.forEach(proxy => {
-                                const option = document.createElement('option');
-                                option.value = proxy;
-                                option.textContent = proxy;
-                                proxySelect.appendChild(option);
-                            });
-                            statusDiv.textContent = `已加载 ${proxies.length} 个代理节点`;
-                        } else {
-                            statusDiv.textContent = '未找到代理节点';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('获取代理节点出错:', error);
-                        proxySelect.innerHTML = '<option value="">-- 无法获取代理节点 --</option>';
-                        statusDiv.textContent = `错误: ${error.message}`;
-                    });
             }
         </script>
         
@@ -193,7 +231,7 @@
                         <form th:action="@{/proxy-groups/add}" method="post" th:object="${newConfig}">
                             <div class="mb-3">
                                 <label for="groupName" class="form-label">策略组</label>
-                                <select class="form-select" id="groupName" name="groupName" required onchange="loadProxiesGlobal();">
+                                <select class="form-select" id="groupName" name="groupName" required onchange="loadProxies();">
                                     <option value="">-- 选择策略组 --</option>
                                     <option th:each="group : ${availableGroups.keySet()}" th:value="${group}" th:text="${group}">Proxy</option>
                                 </select>
@@ -217,7 +255,6 @@
                                 <label for="maxDelay" class="form-label">最大可接受延迟(毫秒)</label>
                                 <input type="number" class="form-control" id="maxDelay" name="maxDelay" value="500" required>
                             </div>
-
                             
                             <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -243,7 +280,7 @@
                             
                             <div class="mb-3">
                                 <label for="editGroupName" class="form-label">策略组</label>
-                                <select class="form-select" id="editGroupName" name="groupName" required onchange="loadProxiesGlobal('edit');">
+                                <select class="form-select" id="editGroupName" name="groupName" required onchange="loadProxies('edit');">
                                     <option value="">-- 选择策略组 --</option>
                                     <option th:each="group : ${availableGroups.keySet()}" th:value="${group}" th:text="${group}">Proxy</option>
                                 </select>
@@ -287,122 +324,71 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM加载完成，初始化事件监听...');
 
-            // 策略组选择变化时更新优先节点选项
-            const groupSelect = document.getElementById('groupName');
-            const proxySelect = document.getElementById('preferredProxy');
-            const statusDiv = document.getElementById('proxyLoadingStatus');
-
-            if (!groupSelect) {
-                console.error('找不到策略组选择框元素!');
-                return;
-            }
-
-            console.log('已找到策略组选择框，添加change事件监听...');
+            // 确保模态框相关的事件监听器设置正确
+            const setupModalEvents = () => {
+                console.log('设置模态框事件...');
+                
+                // 添加配置模态框
+                const addConfigModal = document.getElementById('addConfigModal');
+                if (addConfigModal) {
+                    console.log('找到添加配置模态框，设置事件监听');
+                    
+                    addConfigModal.addEventListener('shown.bs.modal', function() {
+                        console.log('添加配置模态框已显示');
+                        
+                        // 重置选择框
+                        const groupSelect = document.getElementById('groupName');
+                        const proxySelect = document.getElementById('preferredProxy');
+                        const statusDiv = document.getElementById('proxyLoadingStatus');
+                        
+                        console.log('重置前的DOM元素状态:', {
+                            groupSelectExists: !!groupSelect,
+                            proxySelectExists: !!proxySelect,
+                            statusDivExists: !!statusDiv
+                        });
+                        
+                        if (groupSelect) groupSelect.selectedIndex = 0;
+                        if (proxySelect) proxySelect.innerHTML = '<option value="">-- 请先选择策略组 --</option>';
+                        if (statusDiv) statusDiv.textContent = '';
+                    });
+                } else {
+                    console.warn('未找到添加配置模态框');
+                }
+                
+                // 编辑配置模态框
+                const editConfigModal = document.getElementById('editConfigModal');
+                if (editConfigModal) {
+                    console.log('找到编辑配置模态框，设置事件监听');
+                    
+                    editConfigModal.addEventListener('shown.bs.modal', function() {
+                        console.log('编辑配置模态框已显示');
+                        
+                        // 确保编辑模态框中的元素已正确加载
+                        setTimeout(() => {
+                            const editGroupSelect = document.getElementById('editGroupName');
+                            if (editGroupSelect && editGroupSelect.value) {
+                                console.log('编辑模态框中已有选中的策略组，加载代理节点');
+                                loadProxies('edit');
+                            }
+                        }, 300);
+                    });
+                } else {
+                    console.warn('未找到编辑配置模态框');
+                }
+            };
             
-            // 页面加载完成后，检查是否已经有选中的策略组
+            // 页面加载完成后执行初始化
             setTimeout(() => {
+                console.log('执行页面初始化...');
+                setupModalEvents();
+                
+                // 检查是否有默认选中的策略组
+                const groupSelect = document.getElementById('groupName');
                 if (groupSelect && groupSelect.value) {
                     console.log('页面加载完成后发现已有选中的策略组，自动加载代理节点');
-                    loadProxiesGlobal();
+                    loadProxies();
                 }
             }, 500);
-
-            
-            // 定义加载代理节点的函数
-            function loadProxies(selectedGroup) {
-                console.log('开始加载代理节点，选中的策略组:', selectedGroup);
-                
-                if (!selectedGroup) {
-                    console.warn('策略组为空，不进行API调用');
-                    proxySelect.innerHTML = '<option value="">-- 请先选择策略组 --</option>';
-                    statusDiv.textContent = '';
-                    return;
-                }
-
-                proxySelect.innerHTML = '<option value="">-- 加载中... --</option>';
-                statusDiv.textContent = '正在加载代理节点...';
-                statusDiv.className = 'form-text text-info';
-
-                const apiUrl = `/api/config/group-proxies/${encodeURIComponent(selectedGroup)}`;
-                console.log('请求API:', apiUrl);
-                
-                // 添加时间戳避免缓存
-                const timestamp = new Date().getTime();
-                const urlWithCache = `${apiUrl}?_=${timestamp}`;
-                console.log('添加缓存参数后的URL:', urlWithCache);
-
-                fetch(urlWithCache, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Cache-Control': 'no-cache'
-                    }
-                })
-                    .then(response => {
-                        console.log('API响应状态:', response.status);
-                        if (!response.ok) {
-                            throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
-                        }
-                        return response.json();
-                    })
-                    .then(proxies => {
-                        console.log('获取到代理节点:', proxies);
-                        proxySelect.innerHTML = '<option value="">-- 选择优先节点 --</option>';
-
-                        if (!Array.isArray(proxies) || proxies.length === 0) {
-                            console.warn('代理节点列表为空或不是数组');
-                            statusDiv.textContent = '未找到代理节点';
-                            statusDiv.className = 'form-text text-warning';
-                            return;
-                        }
-
-                        proxies.forEach(proxy => {
-                            const option = document.createElement('option');
-                            option.value = proxy;
-                            option.textContent = proxy;
-                            proxySelect.appendChild(option);
-                        });
-
-                        statusDiv.textContent = `已加载 ${proxies.length} 个代理节点`;
-                        statusDiv.className = 'form-text text-success';
-                    })
-                    .catch(error => {
-                        console.error('获取代理节点出错:', error);
-                        proxySelect.innerHTML = '<option value="">-- 无法获取代理节点 --</option>';
-                        statusDiv.textContent = `错误: ${error.message}`;
-                        statusDiv.className = 'form-text text-danger';
-                    });
-            }
-
-            // 绑定策略组变化事件
-            groupSelect.addEventListener('change', function() {
-                const selectedGroup = this.value;
-                console.log('策略组选择变化:', selectedGroup);
-                loadProxies(selectedGroup);
-            });
-            
-            // 模态框打开时触发事件，确保在模态框显示后绑定事件
-            const addConfigModal = document.getElementById('addConfigModal');
-            if (addConfigModal) {
-                addConfigModal.addEventListener('shown.bs.modal', function() {
-                    console.log('模态框已显示');
-                    // 重置选择框
-                    if (groupSelect) groupSelect.selectedIndex = 0;
-                    if (proxySelect) proxySelect.innerHTML = '<option value="">-- 请先选择策略组 --</option>';
-                    if (statusDiv) statusDiv.textContent = '';
-                });
-                
-                // 模态框完全显示后检查
-                addConfigModal.addEventListener('shown.bs.modal', function() {
-                    console.log('模态框完全显示，检查是否需要自动加载代理节点');
-                    setTimeout(() => {
-                        if (groupSelect && groupSelect.value) {
-                            console.log('模态框打开时已有选中的策略组，自动加载代理节点');
-                            loadProxiesGlobal();
-                        }
-                    }, 500);
-                });
-            }
         });
     </script>
 </body>
