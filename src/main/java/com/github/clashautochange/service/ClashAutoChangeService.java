@@ -89,9 +89,9 @@ public class ClashAutoChangeService {
             // 检查优先节点是否可用
             Integer preferredDelay = delayResults.get(preferredProxy);
             if (preferredDelay != null && preferredDelay <= maxDelay) {
-                // 优先节点可用且延迟在可接受范围内
+                // 优先节点可用且延迟在可接受范围内，直接切换，忽略超时次数
                 if (!preferredProxy.equals(currentProxy)) {
-                    log.info("切换代理: {} -> {}, 延迟: {}ms", currentProxy, preferredProxy, preferredDelay);
+                    log.info("优先节点可用，直接切换: {} -> {}, 延迟: {}ms", currentProxy, preferredProxy, preferredDelay);
                     clashApiService.selectProxy(groupName, preferredProxy);
                 }
                 // 重置超时计数
@@ -107,11 +107,12 @@ public class ClashAutoChangeService {
             boolean isCurrentProxyAvailable = currentDelay != null && currentDelay <= maxDelay;
 
             if (isCurrentProxyAvailable) {
-                // 当前节点可用，重置超时计数
+                // 当前节点可用，重置超时计数并保持不变
                 if (config.getCurrentTimeoutCount() > 0) {
                     config.setCurrentTimeoutCount(0);
                     proxyGroupConfigService.saveConfig(config);
                 }
+                // 保持当前节点稳定，不寻找更低延迟的节点
                 return;
             } else {
                 // 当前节点不可用，增加超时计数
@@ -124,7 +125,7 @@ public class ClashAutoChangeService {
                     return; // 未达到最大超时次数，不切换
                 }
                 
-                log.info("节点 {} 连续超时 {} 次，开始寻找更优节点", currentProxy, config.getCurrentTimeoutCount());
+                log.info("节点 {} 连续超时 {} 次，开始寻找可用节点", currentProxy, config.getCurrentTimeoutCount());
             }
 
             // 找出延迟最低且小于最大延迟的代理
@@ -137,7 +138,7 @@ public class ClashAutoChangeService {
                 Integer bestDelay = bestProxy.get().getValue();
 
                 // 切换到最佳代理
-                log.info("切换代理: {} -> {}, 延迟: {}ms, 连续超时次数: {}", currentProxy, bestProxyName, bestDelay, config.getCurrentTimeoutCount());
+                log.info("切换代理: {} -> {}, 延迟: {}ms", currentProxy, bestProxyName, bestDelay);
                 clashApiService.selectProxy(groupName, bestProxyName);
                 
                 // 切换后重置超时计数
