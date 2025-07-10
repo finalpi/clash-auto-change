@@ -63,6 +63,7 @@ public class ClashAutoChangeService {
         String preferredProxy = config.getPreferredProxy();
         Integer timeout = config.getTimeout();
         Integer maxDelay = config.getMaxDelay();
+        Integer maxTimeoutCount = config.getMaxTimeoutCount();
         String testUrlToUse = config.getTestUrl() != null ? config.getTestUrl() : this.testUrl;
 
         try {
@@ -93,6 +94,11 @@ public class ClashAutoChangeService {
                     log.info("切换代理: {} -> {}, 延迟: {}ms", currentProxy, preferredProxy, preferredDelay);
                     clashApiService.selectProxy(groupName, preferredProxy);
                 }
+                // 重置超时计数
+                if (config.getCurrentTimeoutCount() > 0) {
+                    config.setCurrentTimeoutCount(0);
+                    proxyGroupConfigService.saveConfig(config);
+                }
                 return;
             }
 
@@ -100,9 +106,25 @@ public class ClashAutoChangeService {
             Integer currentDelay = delayResults.get(currentProxy);
             boolean isCurrentProxyAvailable = currentDelay != null && currentDelay <= maxDelay;
 
-            // 如果当前节点可用，且优先节点不可用，则不切换
-            if (isCurrentProxyAvailable && (preferredDelay == null || preferredDelay > maxDelay)) {
+            if (isCurrentProxyAvailable) {
+                // 当前节点可用，重置超时计数
+                if (config.getCurrentTimeoutCount() > 0) {
+                    config.setCurrentTimeoutCount(0);
+                    proxyGroupConfigService.saveConfig(config);
+                }
                 return;
+            } else {
+                // 当前节点不可用，增加超时计数
+                config.setCurrentTimeoutCount(config.getCurrentTimeoutCount() + 1);
+                proxyGroupConfigService.saveConfig(config);
+                
+                // 检查是否超过最大超时次数
+                if (config.getCurrentTimeoutCount() < maxTimeoutCount) {
+                    log.info("节点 {} 超时，当前超时计数: {}/{}", currentProxy, config.getCurrentTimeoutCount(), maxTimeoutCount);
+                    return; // 未达到最大超时次数，不切换
+                }
+                
+                log.info("节点 {} 连续超时 {} 次，开始寻找更优节点", currentProxy, config.getCurrentTimeoutCount());
             }
 
             // 找出延迟最低且小于最大延迟的代理
@@ -114,11 +136,13 @@ public class ClashAutoChangeService {
                 String bestProxyName = bestProxy.get().getKey();
                 Integer bestDelay = bestProxy.get().getValue();
 
-                // 只有当最佳代理不是当前代理时才切换
-                if (!bestProxyName.equals(currentProxy)) {
-                    log.info("切换代理: {} -> {}, 延迟: {}ms", currentProxy, bestProxyName, bestDelay);
-                    clashApiService.selectProxy(groupName, bestProxyName);
-                }
+                // 切换到最佳代理
+                log.info("切换代理: {} -> {}, 延迟: {}ms, 连续超时次数: {}", currentProxy, bestProxyName, bestDelay, config.getCurrentTimeoutCount());
+                clashApiService.selectProxy(groupName, bestProxyName);
+                
+                // 切换后重置超时计数
+                config.setCurrentTimeoutCount(0);
+                proxyGroupConfigService.saveConfig(config);
             }
         } catch (Exception e) {
             log.error("处理策略组 {} 时出错: {}", groupName, e.getMessage());

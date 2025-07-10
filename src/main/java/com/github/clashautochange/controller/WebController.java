@@ -182,6 +182,7 @@ public class WebController {
                 existingConfig.setTestUrl(config.getTestUrl());
                 existingConfig.setTimeout(config.getTimeout());
                 existingConfig.setMaxDelay(config.getMaxDelay());
+                existingConfig.setMaxTimeoutCount(config.getMaxTimeoutCount());
                 existingConfig.setEnabled(config.getEnabled());
                 proxyGroupConfigService.saveConfig(existingConfig);
                 redirectAttributes.addFlashAttribute("message", "策略组配置已更新");

@@ -54,6 +54,18 @@ public class ProxyGroupConfig {
     private Integer maxDelay;
 
     /**
+     * 最大超时次数，超过此次数才会切换节点
+     */
+    @Column(columnDefinition = "integer default 3")
+    private Integer maxTimeoutCount = 3; // 默认值为3次
+
+    /**
+     * 当前超时计数，记录连续超时的次数
+     */
+    @Column(columnDefinition = "integer default 0")
+    private Integer currentTimeoutCount = 0;
+
+    /**
      * 是否启用
      */
     @Column(nullable = false)

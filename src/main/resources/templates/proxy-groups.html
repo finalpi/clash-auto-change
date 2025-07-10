@@ -15,9 +15,10 @@
                 const testUrl = button.getAttribute('data-test-url');
                 const timeout = button.getAttribute('data-timeout');
                 const maxDelay = button.getAttribute('data-max-delay');
+                const maxTimeoutCount = button.getAttribute('data-max-timeout-count');
                 const enabled = button.getAttribute('data-enabled') === 'true';
                 
-                console.log('配置数据:', { configId, groupName, preferredProxy, testUrl, timeout, maxDelay, enabled });
+                console.log('配置数据:', { configId, groupName, preferredProxy, testUrl, timeout, maxDelay, maxTimeoutCount, enabled });
                 
                 // 设置表单的action
                 const form = document.getElementById('editConfigForm');
@@ -37,6 +38,7 @@
                 document.getElementById('editTestUrl').value = testUrl;
                 document.getElementById('editTimeout').value = timeout;
                 document.getElementById('editMaxDelay').value = maxDelay;
+                document.getElementById('editMaxTimeoutCount').value = maxTimeoutCount || 3; // 默认值为3
                 document.getElementById('editEnabled').checked = enabled;
                 
                 // 加载代理节点
@@ -173,13 +175,14 @@
                         <th>测试URL</th>
                         <th>超时(ms)</th>
                         <th>最大延迟(ms)</th>
+                        <th>最大超时次数</th>
                         <th>状态</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr th:if="${configs.empty}">
-                        <td colspan="8" class="text-center">暂无配置</td>
+                        <td colspan="9" class="text-center">暂无配置</td>
                     </tr>
                     <tr th:each="config : ${configs}">
                         <td th:text="${config.id}">1</td>
@@ -188,6 +191,7 @@
                         <td th:text="${config.testUrl}">https://www.gstatic.com/generate_204</td>
                         <td th:text="${config.timeout}">5000</td>
                         <td th:text="${config.maxDelay}">500</td>
+                        <td th:text="${config.maxTimeoutCount}">3</td>
                         <td>
                             <span th:if="${config.enabled}" class="badge bg-success">已启用</span>
                             <span th:unless="${config.enabled}" class="badge bg-secondary">已禁用</span>
@@ -202,6 +206,7 @@
                                         th:data-test-url="${config.testUrl}"
                                         th:data-timeout="${config.timeout}"
                                         th:data-max-delay="${config.maxDelay}"
+                                        th:data-max-timeout-count="${config.maxTimeoutCount}"
                                         th:data-enabled="${config.enabled}"
                                         onclick="prepareEditModal(this)">
                                     <span data-feather="edit"></span>
@@ -255,6 +260,11 @@
                                 <label for="maxDelay" class="form-label">最大可接受延迟(毫秒)</label>
                                 <input type="number" class="form-control" id="maxDelay" name="maxDelay" value="500" required>
                             </div>
+                            <div class="mb-3">
+                                <label for="maxTimeoutCount" class="form-label">最大超时次数</label>
+                                <input type="number" class="form-control" id="maxTimeoutCount" name="maxTimeoutCount" value="3" required min="1">
+                                <div class="form-text">连续超时次数达到此值时才会切换节点</div>
+                            </div>
                             
                             <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
@@ -303,6 +313,11 @@
                             <div class="mb-3">
                                 <label for="editMaxDelay" class="form-label">最大可接受延迟(毫秒)</label>
                                 <input type="number" class="form-control" id="editMaxDelay" name="maxDelay" value="500" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editMaxTimeoutCount" class="form-label">最大超时次数</label>
+                                <input type="number" class="form-control" id="editMaxTimeoutCount" name="maxTimeoutCount" value="3" required min="1">
+                                <div class="form-text">连续超时次数达到此值时才会切换节点</div>
                             </div>
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="editEnabled" name="enabled">
