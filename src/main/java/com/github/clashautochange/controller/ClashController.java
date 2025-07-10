@@ -52,16 +52,16 @@ public class ClashController {
             log.info("接收到测试连接请求");
             Map<String, Object> result = new HashMap<>();
             
-            // 尝试获取代理信息
-            ClashProxiesResponse response = clashApiService.getAllProxies();
+            // 使用版本接口测试连接
+            Map<String, Object> versionInfo = clashApiService.getVersion();
             
-            // 如果成功获取到代理信息，返回成功状态
+            // 如果成功获取到版本信息，返回成功状态
             result.put("status", "success");
             result.put("message", "连接成功");
-            result.put("proxyCount", response != null && response.getProxies() != null ? 
-                    response.getProxies().size() : 0);
+            result.put("version", versionInfo.get("version"));
+            result.put("premium", versionInfo.getOrDefault("premium", false));
             
-            log.info("测试连接成功，代理数量: {}", result.get("proxyCount"));
+            log.info("测试连接成功，Clash版本: {}", versionInfo.get("version"));
             return ResponseEntity.ok(result);
         } catch (ResourceAccessException e) {
             log.error("测试连接失败 - 无法连接到Clash API: {}", e.getMessage());

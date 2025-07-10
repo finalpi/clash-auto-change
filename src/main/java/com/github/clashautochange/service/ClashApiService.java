@@ -52,6 +52,31 @@ public class ClashApiService {
     }
 
     /**
+     * 获取Clash版本信息
+     * 
+     * @return 版本信息Map
+     */
+    public Map<String, Object> getVersion() {
+        HttpEntity<Void> requestEntity = new HttpEntity<>(getHeaders());
+        log.info("获取Clash版本信息，请求URL: {}/version", clashApiConfig.getBaseUrl());
+        
+        ResponseEntity<Map> response = restTemplate.exchange(
+                clashApiConfig.getBaseUrl() + "/version",
+                HttpMethod.GET,
+                requestEntity,
+                Map.class
+        );
+        
+        if (response.getBody() != null) {
+            log.info("成功获取Clash版本信息: {}", response.getBody());
+            return response.getBody();
+        } else {
+            log.warn("获取Clash版本信息返回空结果");
+            return new HashMap<>();
+        }
+    }
+
+    /**
      * 获取所有代理
      *
      * @return 代理响应

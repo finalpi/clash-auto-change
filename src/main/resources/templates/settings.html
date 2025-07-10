@@ -41,41 +41,75 @@
                 <div id="testResult" class="mt-3" style="display: none;"></div>
             </div>
         </div>
-    </div>
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const testButton = document.getElementById('testConnection');
-            const testResult = document.getElementById('testResult');
-            
-            testButton.addEventListener('click', function() {
-                testResult.style.display = 'none';
-                testButton.disabled = true;
-                testButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 测试中...';
+        
+        <script>
+            // 使用立即执行函数，避免变量污染全局作用域
+            (function() {
+                // 等待DOM完全加载
+                if (document.readyState === "loading") {
+                    document.addEventListener("DOMContentLoaded", initTestButton);
+                } else {
+                    initTestButton();
+                }
                 
-                fetch('/api/clash/proxies')
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('连接失败: ' + response.status);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        testResult.className = 'alert alert-success mt-3';
-                        testResult.innerHTML = '连接成功！已获取到 ' + Object.keys(data.proxies).length + ' 个代理。';
-                        testResult.style.display = 'block';
-                    })
-                    .catch(error => {
-                        testResult.className = 'alert alert-danger mt-3';
-                        testResult.innerHTML = '连接失败: ' + error.message;
-                        testResult.style.display = 'block';
-                    })
-                    .finally(() => {
-                        testButton.disabled = false;
-                        testButton.innerHTML = '测试连接';
+                function initTestButton() {
+                    var testButton = document.getElementById('testConnection');
+                    var testResult = document.getElementById('testResult');
+                    
+                    if (!testButton || !testResult) {
+                        console.error('未找到必要的DOM元素');
+                        return;
+                    }
+                    
+                    testButton.addEventListener('click', function() {
+                        console.log('测试按钮被点击');
+                        
+                        // 隐藏之前的结果
+                        testResult.style.display = 'none';
+                        
+                        // 禁用按钮并显示加载状态
+                        testButton.disabled = true;
+                        testButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 测试中...';
+                        
+                        // 添加时间戳防止缓存
+                        var url = '/api/clash/test-connection?_=' + new Date().getTime();
+                        
+                        // 发送请求
+                        fetch(url)
+                            .then(function(response) {
+                                console.log('收到响应:', response.status);
+                                if (!response.ok) {
+                                    throw new Error('连接失败: ' + response.status);
+                                }
+                                return response.json();
+                            })
+                            .then(function(data) {
+                                console.log('连接成功，收到数据:', data);
+                                testResult.className = 'alert alert-success mt-3';
+                                var versionText = data.version ? 'Clash ' + data.version : 'Clash';
+                                if (data.premium === true) {
+                                    versionText += ' Premium';
+                                }
+                                testResult.innerHTML = '连接成功！已连接到 ' + versionText + '。';
+                                testResult.style.display = 'block';
+                            })
+                            .catch(function(error) {
+                                console.error('连接失败:', error);
+                                testResult.className = 'alert alert-danger mt-3';
+                                testResult.innerHTML = '连接失败: ' + error.message;
+                                testResult.style.display = 'block';
+                            })
+                            .finally(function() {
+                                console.log('请求完成，重新启用按钮');
+                                testButton.disabled = false;
+                                testButton.innerHTML = '测试连接';
+                            });
                     });
-            });
-        });
-    </script>
+                    
+                    console.log('测试按钮初始化完成');
+                }
+            })();
+        </script>
+    </div>
 </body>
 </html> 
