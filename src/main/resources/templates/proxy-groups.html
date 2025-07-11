@@ -234,6 +234,7 @@
                     </div>
                     <div class="modal-body">
                         <form th:action="@{/proxy-groups/add}" method="post" th:object="${newConfig}">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                             <div class="mb-3">
                                 <label for="groupName" class="form-label">策略组</label>
                                 <select class="form-select" id="groupName" name="groupName" required onchange="loadProxies();">
@@ -287,6 +288,7 @@
                     <div class="modal-body">
                         <form id="editConfigForm" method="post">
                             <input type="hidden" id="editConfigId" name="id" value="">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                             
                             <div class="mb-3">
                                 <label for="editGroupName" class="form-label">策略组</label>

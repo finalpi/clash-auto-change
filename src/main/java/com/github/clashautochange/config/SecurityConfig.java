@@ -91,7 +91,15 @@ public class SecurityConfig {
                 .rememberMeServices(rememberMeServices())
                 .key(REMEMBER_ME_KEY)
             )
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**")); // 对API请求禁用CSRF保护
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/api/**") // 对API请求禁用CSRF保护
+                .ignoringRequestMatchers("/settings/update") // 对设置更新请求禁用CSRF保护
+                .ignoringRequestMatchers("/proxy-groups/add") // 对添加代理组请求禁用CSRF保护
+                .ignoringRequestMatchers("/proxy-groups/update/**") // 对更新代理组请求禁用CSRF保护
+                .ignoringRequestMatchers("/proxy-groups/delete/**") // 对删除代理组请求禁用CSRF保护
+                .ignoringRequestMatchers("/proxy-groups/toggle/**") // 对切换代理组状态请求禁用CSRF保护
+                .ignoringRequestMatchers("/profile") // 对个人资料更新请求禁用CSRF保护
+            );
         
         return http.build();
     }

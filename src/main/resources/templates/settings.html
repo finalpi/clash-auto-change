@@ -12,6 +12,7 @@
             </div>
             <div class="card-body">
                 <form th:action="@{/settings/update}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
                     <div class="mb-3">
                         <label for="baseUrl" class="form-label">API 基础 URL</label>
                         <input type="text" class="form-control" id="baseUrl" name="baseUrl" th:value="${apiConfig.baseUrl}" required>
