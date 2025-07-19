@@ -44,7 +44,7 @@ public class ProxyMonitorService {
             return;
         }
 
-        log.info("开始监控代理组延迟，共 {} 个代理组", enabledGroups.size());
+        log.debug("开始监控代理组延迟，共 {} 个代理组", enabledGroups.size());
 
         // 处理每个代理组
         for (MonitoredProxyGroup group : enabledGroups) {
@@ -66,7 +66,7 @@ public class ProxyMonitorService {
         String testUrl = group.getTestUrl();
         Integer timeout = group.getTimeout();
 
-        log.info("监控代理组: {}, 测试URL: {}, 超时: {}ms", groupName, testUrl, timeout);
+        log.debug("监控代理组: {}, 测试URL: {}, 超时: {}ms", groupName, testUrl, timeout);
 
         try {
             // 获取代理组中的所有节点
@@ -76,7 +76,7 @@ public class ProxyMonitorService {
                 return;
             }
 
-            log.info("代理组 {} 中找到 {} 个代理节点", groupName, proxies.size());
+            log.debug("代理组 {} 中找到 {} 个代理节点", groupName, proxies.size());
 
             // 测试所有节点的延迟
             Map<String, Integer> delayResults = clashApiService.testGroupDelay(groupName, testUrl, timeout);
@@ -96,7 +96,7 @@ public class ProxyMonitorService {
             }
 
             proxyDelayHistoryService.saveAllHistories(histories);
-            log.info("成功保存代理组 {} 的 {} 条延迟历史记录", groupName, histories.size());
+            log.debug("成功保存代理组 {} 的 {} 条延迟历史记录", groupName, histories.size());
 
         } catch (Exception e) {
             log.error("处理代理组 {} 时出错: {}", groupName, e.getMessage());
