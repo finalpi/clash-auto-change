@@ -1,26 +1,20 @@
-FROM maven:3.8-openjdk-17-slim as build
-WORKDIR /workspace/app
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /build
 
 # 复制项目文件
 COPY pom.xml .
-COPY src src
+RUN mvn dependency:go-offline
 
-# 构建应用程序
+COPY src/ /build/src/
 RUN mvn package -DskipTests
-RUN mkdir -p target/dependency && (cd target/dependency; jar -xf ../*.jar)
 
-# 运行阶段
-FROM openjdk:17-slim
-VOLUME /tmp
-ARG DEPENDENCY=/workspace/app/target/dependency
+FROM eclipse-temurin:17-jre
+WORKDIR /app
 
-# 复制项目依赖
-COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
-COPY --from=build ${DEPENDENCY}/META-INF /app/META-INF
-COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
+COPY --from=build /build/target/*.jar app.jar
 
-# 数据卷，用于持久化SQLite数据库
-VOLUME /app/db
+# 创建数据库目录
+RUN mkdir -p /app/db
 
 # 环境变量，可以在运行容器时覆盖
 ENV CLASH_API_BASE_URL=http://host.docker.internal:9090
@@ -36,4 +30,4 @@ ENV CLASH_AUTO_CHANGE_CHECK_INTERVAL=5000
 EXPOSE ${SERVER_PORT}
 
 # 运行应用
-ENTRYPOINT ["java", "-cp", "app:app/lib/*", "com.github.clashautochange.ClashAutoChangeApplication"] 
+ENTRYPOINT ["java", "-jar", "app.jar"] 
