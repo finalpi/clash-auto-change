@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -181,6 +183,60 @@ public class ProxyMonitorController {
         
         Map<String, Object> chartData = proxyDelayHistoryService.convertToChartData(histories);
         return ResponseEntity.ok(chartData);
+    }
+
+    @GetMapping("/node-history")
+    public String showNodeHistory(@RequestParam String group, @RequestParam String node, Model model) {
+        // 获取代理组配置
+        MonitoredProxyGroup config = monitoredProxyGroupService.getConfigByGroupName(group).orElse(null);
+        if (config == null) {
+            model.addAttribute("error", "代理组 " + group + " 不存在");
+            return "error";
+        }
+        
+        model.addAttribute("groupName", group);
+        model.addAttribute("nodeName", node);
+        model.addAttribute("config", config);
+        
+        return "node-history";
+    }
+
+    @GetMapping("/api/node-history-data")
+    @ResponseBody
+    public Map<String, Object> getNodeHistoryData(@RequestParam String group, 
+                                                  @RequestParam String node, 
+                                                  @RequestParam(defaultValue = "7") int days) {
+        
+        // 计算时间范围
+        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime startTime = endTime.minusDays(days);
+        
+        // 获取延迟历史数据
+        List<ProxyDelayHistory> historyList = proxyDelayHistoryService.findByGroupNameAndProxyNameAndTimeRange(
+            group, node, startTime, endTime);
+        
+        // 准备返回数据
+        Map<String, Object> result = new HashMap<>();
+        List<String> timeLabels = new ArrayList<>();
+        List<Integer> delayValues = new ArrayList<>();
+        
+        // 如果有数据，按时间排序
+        if (!historyList.isEmpty()) {
+            historyList.sort(Comparator.comparing(ProxyDelayHistory::getTestTime));
+            
+            for (ProxyDelayHistory history : historyList) {
+                timeLabels.add(history.getTestTime().toString());
+                delayValues.add(history.getDelay());
+            }
+        }
+        
+        result.put("timeLabels", timeLabels);
+        result.put("delayValues", delayValues);
+        result.put("groupName", group);
+        result.put("nodeName", node);
+        result.put("days", days);
+        
+        return result;
     }
 }
  

@@ -160,4 +160,12 @@ public class ProxyDelayHistoryService {
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         long deletedCount = proxyDelayHistoryRepository.deleteByTestTimeBefore(thirtyDaysAgo);
     }
+
+    public List<ProxyDelayHistory> findByGroupNameAndTimeRange(String groupName, LocalDateTime startTime, LocalDateTime endTime) {
+        return proxyDelayHistoryRepository.findByGroupNameAndTestTimeBetween(groupName, startTime, endTime);
+    }
+
+    public List<ProxyDelayHistory> findByGroupNameAndProxyNameAndTimeRange(String groupName, String proxyName, LocalDateTime startTime, LocalDateTime endTime) {
+        return proxyDelayHistoryRepository.findByGroupNameAndProxyNameAndTestTimeBetween(groupName, proxyName, startTime, endTime);
+    }
 } 

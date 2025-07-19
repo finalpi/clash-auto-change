@@ -140,19 +140,34 @@
 
             // 处理代理数据，计算统计信息
             function processProxyData(data) {
+                console.log('原始数据:', data);
+                
                 proxyStats = [];
                 const proxyNames = Object.keys(data.proxyDelays);
+                console.log('代理节点列表:', proxyNames);
+                
+                // 在数据采样之前先计算统计信息，使用原始完整数据
+                const originalStats = {};
+                for (const proxyName of proxyNames) {
+                    const delayValues = data.proxyDelays[proxyName];
+                    console.log(`${proxyName} 原始延迟数据:`, delayValues);
+                    originalStats[proxyName] = calculateStats(delayValues);
+                    console.log(`${proxyName} 原始统计信息:`, originalStats[proxyName]);
+                }
                 
                 // 处理时间数据，确保数据点均匀分布
                 processTimeData(data);
                 
+                // 使用原始统计信息和采样后的数据
                 for (const proxyName of proxyNames) {
-                    const delayValues = data.proxyDelays[proxyName];
-                    const stats = calculateStats(delayValues);
+                    const delayValues = data.proxyDelays[proxyName]; // 使用采样后的数据用于图表显示
+                    const stats = originalStats[proxyName]; // 使用原始数据计算的统计信息
+                    
+                    console.log(`${proxyName} 最终统计信息:`, stats);
                     
                     proxyStats.push({
                         name: proxyName,
-                        delayValues: delayValues,
+                        delayValues: delayValues, // 使用采样后的数据用于图表显示
                         connectivityRate: stats.connectivityRate,
                         maxDelay: stats.maxDelay,
                         minDelay: stats.minDelay,
@@ -160,6 +175,8 @@
                         displayAvgDelay: stats.avgDelay
                     });
                 }
+                
+                console.log('处理后的代理统计信息:', proxyStats);
             }
 
             // 处理时间数据，确保数据点均匀分布
@@ -295,6 +312,9 @@
                                         <span class="badge bg-primary rounded-pill">${proxy.displayAvgDelay}ms</span>
                                     </li>
                                 </ul>
+                                <div class="mt-3 text-center">
+                                    <a href="/proxy-monitor/node-history?group=${encodeURIComponent(groupName)}&node=${encodeURIComponent(proxy.name)}" class="btn btn-sm btn-primary">查看详细历史</a>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -305,16 +325,31 @@
             
             // 计算统计信息
             function calculateStats(delayValues) {
-                // 过滤掉未连通的值（-1）
-                const connectedValues = delayValues.filter(v => v >= 0);
-                
-                // 计算连通率
-                const connectivityRate = Math.round((connectedValues.length / delayValues.length) * 100);
-                
-                // 如果没有连通的值，返回默认统计信息
-                if (connectedValues.length === 0) {
+                // 确保delayValues是数组
+                if (!Array.isArray(delayValues) || delayValues.length === 0) {
+                    console.warn('delayValues不是有效数组或为空:', delayValues);
                     return {
                         connectivityRate: 0,
+                        maxDelay: 'N/A',
+                        minDelay: 'N/A',
+                        avgDelay: 'N/A'
+                    };
+                }
+                
+                // 过滤掉未连通的值（-1）
+                const connectedValues = delayValues.filter(v => v !== null && v !== undefined && v >= 0);
+                const totalCount = delayValues.length;
+                const connectedCount = connectedValues.length;
+                
+                // 计算连通率
+                const connectivityRate = totalCount > 0 ? Math.round((connectedCount / totalCount) * 100) : 0;
+                
+                console.log(`统计信息计算 - 总数: ${totalCount}, 连通数: ${connectedCount}, 连通率: ${connectivityRate}%`);
+                
+                // 如果没有连通的值，返回默认统计信息
+                if (connectedCount === 0) {
+                    return {
+                        connectivityRate: connectivityRate,
                         maxDelay: 'N/A',
                         minDelay: 'N/A',
                         avgDelay: 'N/A'
@@ -390,8 +425,18 @@
                     chartCardBody.className = 'card-body';
                     
                     const chartTitle = document.createElement('h5');
-                    chartTitle.className = 'card-title';
-                    chartTitle.textContent = `${proxy.name} 延迟历史 | 连通率: ${proxy.connectivityRate}% | 平均延迟: ${proxy.displayAvgDelay === 'N/A' ? proxy.displayAvgDelay : proxy.displayAvgDelay + 'ms'}`;
+                    chartTitle.className = 'card-title d-flex justify-content-between align-items-center';
+                    
+                    const titleText = document.createElement('span');
+                    titleText.textContent = `${proxy.name} 延迟历史 | 连通率: ${proxy.connectivityRate}% | 平均延迟: ${proxy.displayAvgDelay === 'N/A' ? proxy.displayAvgDelay : proxy.displayAvgDelay + 'ms'}`;
+                    
+                    const detailLink = document.createElement('a');
+                    detailLink.href = `/proxy-monitor/node-history?group=${encodeURIComponent(groupName)}&node=${encodeURIComponent(proxy.name)}`;
+                    detailLink.className = 'btn btn-sm btn-outline-primary';
+                    detailLink.textContent = '查看详情';
+                    
+                    chartTitle.appendChild(titleText);
+                    chartTitle.appendChild(detailLink);
                     
                     const chartContainer = document.createElement('div');
                     chartContainer.className = 'chart-container';
