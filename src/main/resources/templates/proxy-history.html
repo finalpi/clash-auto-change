@@ -46,6 +46,24 @@
             </div>
         </div>
 
+        <!-- 排序控制 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">排序方式</h5>
+                        <div class="btn-group" role="group" aria-label="排序选项">
+                            <button type="button" class="btn btn-outline-primary" onclick="sortProxies('connectivity', 'desc')">连通率高→低</button>
+                            <button type="button" class="btn btn-outline-primary" onclick="sortProxies('connectivity', 'asc')">连通率低→高</button>
+                            <button type="button" class="btn btn-outline-primary" onclick="sortProxies('avgDelay', 'asc')">平均延迟低→高</button>
+                            <button type="button" class="btn btn-outline-primary" onclick="sortProxies('avgDelay', 'desc')">平均延迟高→低</button>
+                            <button type="button" class="btn btn-outline-primary" onclick="sortProxies('name', 'asc')">名称排序</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 代理节点统计信息 -->
         <div id="proxyStatsContainer" class="row mb-4">
             <!-- 统计信息将在这里动态生成 -->
@@ -74,6 +92,9 @@
             let chartData;
             let charts = {};
             let currentDays = 7;
+            let proxyStats = []; // 存储代理节点统计信息
+            let currentSortField = 'connectivity'; // 默认排序字段
+            let currentSortOrder = 'desc'; // 默认排序顺序
             
             // 页面加载完成后初始化图表
             document.addEventListener('DOMContentLoaded', function() {
@@ -108,22 +129,74 @@
                     .then(response => response.json())
                     .then(data => {
                         chartData = data;
-                        createProxyStats(data);
-                        createProxyCharts(data);
+                        processProxyData(data);
+                        sortProxies(currentSortField, currentSortOrder);
                     })
                     .catch(error => {
                         console.error('获取延迟历史数据失败:', error);
                         alert('获取延迟历史数据失败: ' + error.message);
                     });
             }
+
+            // 处理代理数据，计算统计信息
+            function processProxyData(data) {
+                proxyStats = [];
+                const proxyNames = Object.keys(data.proxyDelays);
+                
+                for (const proxyName of proxyNames) {
+                    const delayValues = data.proxyDelays[proxyName];
+                    const stats = calculateStats(delayValues);
+                    
+                    proxyStats.push({
+                        name: proxyName,
+                        delayValues: delayValues,
+                        connectivityRate: stats.connectivityRate,
+                        maxDelay: stats.maxDelay,
+                        minDelay: stats.minDelay,
+                        avgDelay: stats.avgDelay === 'N/A' ? 9999 : stats.avgDelay, // 用于排序
+                        displayAvgDelay: stats.avgDelay
+                    });
+                }
+            }
+            
+            // 排序代理节点
+            function sortProxies(field, order) {
+                currentSortField = field;
+                currentSortOrder = order;
+                
+                // 高亮当前选中的排序按钮
+                document.querySelectorAll('.btn-group button').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                document.querySelector(`.btn-group button[onclick="sortProxies('${field}', '${order}')"]`).classList.add('active');
+                
+                if (!proxyStats || proxyStats.length === 0) return;
+                
+                proxyStats.sort((a, b) => {
+                    let comparison = 0;
+                    
+                    if (field === 'connectivity') {
+                        comparison = a.connectivityRate - b.connectivityRate;
+                    } else if (field === 'avgDelay') {
+                        comparison = a.avgDelay - b.avgDelay;
+                    } else if (field === 'name') {
+                        comparison = a.name.localeCompare(b.name);
+                    }
+                    
+                    return order === 'asc' ? comparison : -comparison;
+                });
+                
+                // 更新UI
+                createProxyStats();
+                createProxyCharts();
+            }
             
             // 创建代理节点统计信息
-            function createProxyStats(data) {
+            function createProxyStats() {
                 const statsContainer = document.getElementById('proxyStatsContainer');
                 statsContainer.innerHTML = '';
                 
-                const proxyNames = Object.keys(data.proxyDelays);
-                if (proxyNames.length === 0) {
+                if (proxyStats.length === 0) {
                     statsContainer.innerHTML = `
                         <div class="col-12">
                             <div class="alert alert-info">
@@ -135,34 +208,31 @@
                 }
                 
                 // 创建统计信息卡片
-                for (const proxyName of proxyNames) {
-                    const delayValues = data.proxyDelays[proxyName];
-                    const stats = calculateStats(delayValues);
-                    
+                for (const proxy of proxyStats) {
                     const statsCard = document.createElement('div');
                     statsCard.className = 'col-md-3 mb-4';
                     statsCard.innerHTML = `
-                        <div class="card h-100 ${stats.connectivityRate < 80 ? 'border-danger' : 'border-success'}">
-                            <div class="card-header ${stats.connectivityRate < 80 ? 'bg-danger text-white' : 'bg-success text-white'}">
-                                <h5 class="card-title mb-0">${proxyName}</h5>
+                        <div class="card h-100 ${proxy.connectivityRate < 80 ? 'border-danger' : 'border-success'}">
+                            <div class="card-header ${proxy.connectivityRate < 80 ? 'bg-danger text-white' : 'bg-success text-white'}">
+                                <h5 class="card-title mb-0">${proxy.name}</h5>
                             </div>
                             <div class="card-body">
                                 <ul class="list-group list-group-flush">
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         连通率
-                                        <span class="badge ${stats.connectivityRate < 80 ? 'bg-danger' : 'bg-success'} rounded-pill">${stats.connectivityRate}%</span>
+                                        <span class="badge ${proxy.connectivityRate < 80 ? 'bg-danger' : 'bg-success'} rounded-pill">${proxy.connectivityRate}%</span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         最大延迟
-                                        <span class="badge bg-primary rounded-pill">${stats.maxDelay}ms</span>
+                                        <span class="badge bg-primary rounded-pill">${proxy.maxDelay}ms</span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         最小延迟
-                                        <span class="badge bg-primary rounded-pill">${stats.minDelay}ms</span>
+                                        <span class="badge bg-primary rounded-pill">${proxy.minDelay}ms</span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         平均延迟
-                                        <span class="badge bg-primary rounded-pill">${stats.avgDelay}ms</span>
+                                        <span class="badge bg-primary rounded-pill">${proxy.displayAvgDelay}ms</span>
                                     </li>
                                 </ul>
                             </div>
@@ -205,12 +275,11 @@
             }
             
             // 创建代理节点图表
-            function createProxyCharts(data) {
+            function createProxyCharts() {
                 const chartsContainer = document.getElementById('proxyChartsContainer');
                 chartsContainer.innerHTML = '';
                 
-                const proxyNames = Object.keys(data.proxyDelays);
-                if (proxyNames.length === 0) {
+                if (proxyStats.length === 0) {
                     chartsContainer.innerHTML = `
                         <div class="col-12">
                             <div class="alert alert-info">
@@ -231,13 +300,13 @@
                 charts = {};
                 
                 // 准备时间标签
-                const timeLabels = data.timeLabels.map(time => {
+                const timeLabels = chartData.timeLabels.map(time => {
                     const date = new Date(time);
                     return date.toLocaleString();
                 });
                 
                 // 为每个代理节点创建图表
-                for (const proxyName of proxyNames) {
+                for (const proxy of proxyStats) {
                     const chartRow = document.createElement('div');
                     chartRow.className = 'row mb-4';
                     
@@ -252,7 +321,7 @@
                     
                     const chartTitle = document.createElement('h5');
                     chartTitle.className = 'card-title';
-                    chartTitle.textContent = `${proxyName} 延迟历史`;
+                    chartTitle.textContent = `${proxy.name} 延迟历史 | 连通率: ${proxy.connectivityRate}% | 平均延迟: ${proxy.displayAvgDelay === 'N/A' ? proxy.displayAvgDelay : proxy.displayAvgDelay + 'ms'}`;
                     
                     const chartContainer = document.createElement('div');
                     chartContainer.className = 'chart-container';
@@ -261,7 +330,7 @@
                     chartContainer.style.width = '100%';
                     
                     const canvas = document.createElement('canvas');
-                    const chartId = `chart-${proxyName.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                    const chartId = `chart-${proxy.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
                     canvas.id = chartId;
                     
                     chartContainer.appendChild(canvas);
@@ -275,9 +344,7 @@
                     
                     // 创建图表
                     const ctx = canvas.getContext('2d');
-                    const delayValues = data.proxyDelays[proxyName];
-                    
-                    charts[chartId] = createChart(ctx, timeLabels, delayValues, proxyName);
+                    charts[chartId] = createChart(ctx, timeLabels, proxy.delayValues, proxy.name);
                 }
             }
             
