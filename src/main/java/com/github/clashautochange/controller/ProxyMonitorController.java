@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 代理监控控制器
@@ -237,6 +238,63 @@ public class ProxyMonitorController {
         result.put("days", days);
         
         return result;
+    }
+
+    @GetMapping("/api/proxy-stats/{groupName}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getProxyStats(@PathVariable String groupName,
+                                                         @RequestParam(defaultValue = "7") int days) {
+        
+        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime startTime = endTime.minusDays(days);
+        
+        // 获取该代理组的所有历史记录
+        List<ProxyDelayHistory> histories = proxyDelayHistoryService.getHistoriesByTimeRange(groupName, startTime, endTime);
+        
+        // 按代理节点分组计算统计信息
+        Map<String, List<ProxyDelayHistory>> groupedByProxy = histories.stream()
+                .collect(Collectors.groupingBy(ProxyDelayHistory::getProxyName));
+        
+        Map<String, Map<String, Object>> proxyStats = new HashMap<>();
+        
+        for (Map.Entry<String, List<ProxyDelayHistory>> entry : groupedByProxy.entrySet()) {
+            String proxyName = entry.getKey();
+            List<ProxyDelayHistory> proxyHistories = entry.getValue();
+            
+            // 计算统计信息
+            List<Integer> connectedDelays = proxyHistories.stream()
+                    .map(ProxyDelayHistory::getDelay)
+                    .filter(delay -> delay >= 0)
+                    .collect(Collectors.toList());
+            
+            int totalCount = proxyHistories.size();
+            int connectedCount = connectedDelays.size();
+            double connectivityRate = totalCount > 0 ? (double) connectedCount / totalCount * 100 : 0;
+            
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("connectivityRate", Math.round(connectivityRate));
+            stats.put("totalTests", totalCount);
+            stats.put("connectedTests", connectedCount);
+            
+            if (!connectedDelays.isEmpty()) {
+                stats.put("avgDelay", connectedDelays.stream().mapToInt(Integer::intValue).average().orElse(0));
+                stats.put("minDelay", connectedDelays.stream().mapToInt(Integer::intValue).min().orElse(0));
+                stats.put("maxDelay", connectedDelays.stream().mapToInt(Integer::intValue).max().orElse(0));
+            } else {
+                stats.put("avgDelay", null);
+                stats.put("minDelay", null);
+                stats.put("maxDelay", null);
+            }
+            
+            proxyStats.put(proxyName, stats);
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("proxyStats", proxyStats);
+        result.put("groupName", groupName);
+        result.put("days", days);
+        
+        return ResponseEntity.ok(result);
     }
 }
  
