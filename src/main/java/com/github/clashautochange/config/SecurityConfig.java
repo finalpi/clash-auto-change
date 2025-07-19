@@ -3,6 +3,7 @@ package com.github.clashautochange.config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -26,13 +27,33 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
     private final DataSource dataSource;
+    private final JdbcTemplate jdbcTemplate;
     
     private static final String REMEMBER_ME_KEY = UUID.randomUUID().toString();
 
     @Autowired
-    public SecurityConfig(CustomUserDetailsService userDetailsService, DataSource dataSource) {
+    public SecurityConfig(CustomUserDetailsService userDetailsService, DataSource dataSource, JdbcTemplate jdbcTemplate) {
         this.userDetailsService = userDetailsService;
         this.dataSource = dataSource;
+        this.jdbcTemplate = jdbcTemplate;
+        initRememberMeTable();
+    }
+    
+    /**
+     * 初始化Remember Me表
+     */
+    private void initRememberMeTable() {
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS persistent_logins (" +
+                    "username VARCHAR(64) NOT NULL, " +
+                    "series VARCHAR(64) PRIMARY KEY, " +
+                    "token VARCHAR(64) NOT NULL, " +
+                    "last_used TIMESTAMP NOT NULL)");
+        } catch (Exception e) {
+            // 记录错误但不中断应用启动
+            System.err.println("初始化Remember Me表时出错: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     @Bean
@@ -52,7 +73,7 @@ public class SecurityConfig {
     public PersistentTokenRepository persistentTokenRepository() {
         JdbcTokenRepositoryImpl tokenRepository = new JdbcTokenRepositoryImpl();
         tokenRepository.setDataSource(dataSource);
-        tokenRepository.setCreateTableOnStartup(true);
+        tokenRepository.setCreateTableOnStartup(false); // 我们已经在构造函数中创建了表
         return tokenRepository;
     }
     

@@ -17,7 +17,7 @@ services:
       - SERVER_PORT=7899                                     # 应用程序端口
       - SPRING_DATASOURCE_URL=jdbc:mariadb://mariadb:3306/clash_auto_change?createDatabaseIfNotExist=true
       - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=clash_password
+      - SPRING_DATASOURCE_PASSWORD=123456
 
       # 自动切换配置
       - CLASH_AUTO_CHANGE_CHECK_INTERVAL=5000                # 自动切换节点任务查询间隔（毫秒），默认为5秒
@@ -31,7 +31,7 @@ services:
     image: mariadb:10.11
     container_name: clash-mariadb
     environment:
-      - MYSQL_ROOT_PASSWORD=clash_password
+      - MYSQL_ROOT_PASSWORD=123456
       - MYSQL_DATABASE=clash_auto_change
     ports:
       - "3306:3306"
