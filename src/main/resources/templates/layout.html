@@ -97,6 +97,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" th:classappend="${#strings.equals(title, '代理监控') ? 'active' : ''}" href="/proxy-monitor">
+                                <span data-feather="activity"></span>
+                                代理监控
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" th:classappend="${#strings.equals(title, '系统设置') ? 'active' : ''}" href="/settings">
                                 <span data-feather="settings"></span>
                                 系统设置

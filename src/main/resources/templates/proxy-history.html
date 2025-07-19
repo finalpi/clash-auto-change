@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout('代理延迟历史', ~{::div})}">
+<body>
+    <div>
+        <!-- 引入Chart.js -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2" th:text="${config.groupName + ' 代理延迟历史'}">代理延迟历史</h1>
+            <div class="btn-toolbar mb-2 mb-md-0">
+                <div class="btn-group me-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadChartData(7)">最近7天</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadChartData(3)">最近3天</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadChartData(1)">最近1天</button>
+                </div>
+                <a th:href="@{/proxy-monitor}" class="btn btn-sm btn-outline-primary">
+                    <span data-feather="arrow-left"></span>
+                    返回
+                </a>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">代理组信息</h5>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <p><strong>代理组名称:</strong> <span th:text="${config.groupName}">Proxy</span></p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>测试URL:</strong> <span th:text="${config.testUrl}">https://www.gstatic.com/generate_204</span></p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>超时:</strong> <span th:text="${config.timeout}">5000</span>ms</p>
+                            </div>
+                            <div class="col-md-3">
+                                <p><strong>状态:</strong> 
+                                <span th:if="${config.enabled}" class="badge bg-success">已启用</span>
+                                <span th:unless="${config.enabled}" class="badge bg-secondary">已禁用</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 代理节点统计信息 -->
+        <div id="proxyStatsContainer" class="row mb-4">
+            <!-- 统计信息将在这里动态生成 -->
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-2">加载代理节点统计信息...</p>
+            </div>
+        </div>
+
+        <!-- 代理节点图表容器 -->
+        <div id="proxyChartsContainer">
+            <!-- 图表将在这里动态生成 -->
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-2">加载代理节点图表...</p>
+            </div>
+        </div>
+
+        <script th:inline="javascript">
+            // 获取代理组名称
+            const groupName = /*[[${config.groupName}]]*/ 'Proxy';
+            let chartData;
+            let charts = {};
+            let currentDays = 7;
+            
+            // 页面加载完成后初始化图表
+            document.addEventListener('DOMContentLoaded', function() {
+                loadChartData(7); // 默认加载7天数据
+            });
+            
+            // 加载图表数据
+            function loadChartData(days) {
+                currentDays = days;
+                const url = `/proxy-monitor/api/history-data/${encodeURIComponent(groupName)}?days=${days}`;
+                
+                // 显示加载中状态
+                document.getElementById('proxyStatsContainer').innerHTML = `
+                    <div class="col-12 text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">加载中...</span>
+                        </div>
+                        <p class="mt-2">加载代理节点统计信息...</p>
+                    </div>
+                `;
+                
+                document.getElementById('proxyChartsContainer').innerHTML = `
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">加载中...</span>
+                        </div>
+                        <p class="mt-2">加载代理节点图表...</p>
+                    </div>
+                `;
+                
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        chartData = data;
+                        createProxyStats(data);
+                        createProxyCharts(data);
+                    })
+                    .catch(error => {
+                        console.error('获取延迟历史数据失败:', error);
+                        alert('获取延迟历史数据失败: ' + error.message);
+                    });
+            }
+            
+            // 创建代理节点统计信息
+            function createProxyStats(data) {
+                const statsContainer = document.getElementById('proxyStatsContainer');
+                statsContainer.innerHTML = '';
+                
+                const proxyNames = Object.keys(data.proxyDelays);
+                if (proxyNames.length === 0) {
+                    statsContainer.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                没有找到代理节点数据
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // 创建统计信息卡片
+                for (const proxyName of proxyNames) {
+                    const delayValues = data.proxyDelays[proxyName];
+                    const stats = calculateStats(delayValues);
+                    
+                    const statsCard = document.createElement('div');
+                    statsCard.className = 'col-md-3 mb-4';
+                    statsCard.innerHTML = `
+                        <div class="card h-100 ${stats.connectivityRate < 80 ? 'border-danger' : 'border-success'}">
+                            <div class="card-header ${stats.connectivityRate < 80 ? 'bg-danger text-white' : 'bg-success text-white'}">
+                                <h5 class="card-title mb-0">${proxyName}</h5>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        连通率
+                                        <span class="badge ${stats.connectivityRate < 80 ? 'bg-danger' : 'bg-success'} rounded-pill">${stats.connectivityRate}%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        最大延迟
+                                        <span class="badge bg-primary rounded-pill">${stats.maxDelay}ms</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        最小延迟
+                                        <span class="badge bg-primary rounded-pill">${stats.minDelay}ms</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        平均延迟
+                                        <span class="badge bg-primary rounded-pill">${stats.avgDelay}ms</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                    
+                    statsContainer.appendChild(statsCard);
+                }
+            }
+            
+            // 计算统计信息
+            function calculateStats(delayValues) {
+                // 过滤掉未连通的值（-1）
+                const connectedValues = delayValues.filter(v => v >= 0);
+                
+                // 计算连通率
+                const connectivityRate = Math.round((connectedValues.length / delayValues.length) * 100);
+                
+                // 如果没有连通的值，返回默认统计信息
+                if (connectedValues.length === 0) {
+                    return {
+                        connectivityRate: 0,
+                        maxDelay: 'N/A',
+                        minDelay: 'N/A',
+                        avgDelay: 'N/A'
+                    };
+                }
+                
+                // 计算最大、最小和平均延迟
+                const maxDelay = Math.max(...connectedValues);
+                const minDelay = Math.min(...connectedValues);
+                const avgDelay = Math.round(connectedValues.reduce((a, b) => a + b, 0) / connectedValues.length);
+                
+                return {
+                    connectivityRate,
+                    maxDelay,
+                    minDelay,
+                    avgDelay
+                };
+            }
+            
+            // 创建代理节点图表
+            function createProxyCharts(data) {
+                const chartsContainer = document.getElementById('proxyChartsContainer');
+                chartsContainer.innerHTML = '';
+                
+                const proxyNames = Object.keys(data.proxyDelays);
+                if (proxyNames.length === 0) {
+                    chartsContainer.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                没有找到代理节点数据
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // 销毁现有图表
+                for (const chartId in charts) {
+                    if (charts[chartId]) {
+                        charts[chartId].destroy();
+                        charts[chartId] = null;
+                    }
+                }
+                charts = {};
+                
+                // 准备时间标签
+                const timeLabels = data.timeLabels.map(time => {
+                    const date = new Date(time);
+                    return date.toLocaleString();
+                });
+                
+                // 为每个代理节点创建图表
+                for (const proxyName of proxyNames) {
+                    const chartRow = document.createElement('div');
+                    chartRow.className = 'row mb-4';
+                    
+                    const chartCol = document.createElement('div');
+                    chartCol.className = 'col-12';
+                    
+                    const chartCard = document.createElement('div');
+                    chartCard.className = 'card';
+                    
+                    const chartCardBody = document.createElement('div');
+                    chartCardBody.className = 'card-body';
+                    
+                    const chartTitle = document.createElement('h5');
+                    chartTitle.className = 'card-title';
+                    chartTitle.textContent = `${proxyName} 延迟历史`;
+                    
+                    const chartContainer = document.createElement('div');
+                    chartContainer.className = 'chart-container';
+                    chartContainer.style.position = 'relative';
+                    chartContainer.style.height = '300px';
+                    chartContainer.style.width = '100%';
+                    
+                    const canvas = document.createElement('canvas');
+                    const chartId = `chart-${proxyName.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                    canvas.id = chartId;
+                    
+                    chartContainer.appendChild(canvas);
+                    chartCardBody.appendChild(chartTitle);
+                    chartCardBody.appendChild(chartContainer);
+                    chartCard.appendChild(chartCardBody);
+                    chartCol.appendChild(chartCard);
+                    chartRow.appendChild(chartCol);
+                    
+                    chartsContainer.appendChild(chartRow);
+                    
+                    // 创建图表
+                    const ctx = canvas.getContext('2d');
+                    const delayValues = data.proxyDelays[proxyName];
+                    
+                    charts[chartId] = createChart(ctx, timeLabels, delayValues, proxyName);
+                }
+            }
+            
+            // 创建单个图表
+            function createChart(ctx, labels, data, proxyName) {
+                const color = getRandomColor();
+                
+                return new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: `${proxyName} 延迟`,
+                            data: data,
+                            borderColor: color,
+                            backgroundColor: color.replace('1)', '0.2)'),
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            tension: 0.1,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: '延迟 (ms)'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        if (value < 0) return '未连通';
+                                        return value;
+                                    }
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: '时间'
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const value = context.parsed.y;
+                                        if (value < 0) return '未连通';
+                                        return `延迟: ${value}ms`;
+                                    }
+                                }
+                            },
+                            title: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // 获取随机颜色
+            function getRandomColor() {
+                const colors = [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)',
+                    'rgba(199, 199, 199, 1)',
+                    'rgba(83, 102, 255, 1)',
+                    'rgba(40, 159, 64, 1)',
+                    'rgba(210, 199, 199, 1)'
+                ];
+                
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+        </script>
+    </div>
+</body>
+</html> 
