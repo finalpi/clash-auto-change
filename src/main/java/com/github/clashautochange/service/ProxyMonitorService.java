@@ -4,6 +4,7 @@ import com.github.clashautochange.entity.MonitoredProxyGroup;
 import com.github.clashautochange.entity.ProxyDelayHistory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,9 @@ public class ProxyMonitorService {
     private final MonitoredProxyGroupService monitoredProxyGroupService;
     private final ProxyDelayHistoryService proxyDelayHistoryService;
 
+    @Value("${proxy.monitor.check-interval:60000}")
+    private long checkInterval;
+
     @Autowired
     public ProxyMonitorService(
             ClashApiService clashApiService,
@@ -34,9 +38,10 @@ public class ProxyMonitorService {
     }
 
     /**
-     * 定时任务，每分钟监控一次代理组节点延迟
+     * 定时任务，监控代理组节点延迟
+     * 时间间隔可通过 proxy.monitor.check-interval 配置（默认60000毫秒，即1分钟）
      */
-    @Scheduled(fixedRate = 10000) // 每10秒执行一次
+    @Scheduled(fixedDelayString = "${proxy.monitor.check-interval:60000}")
     public void monitorProxyDelay() {
         // 获取所有启用的监控代理组
         List<MonitoredProxyGroup> enabledGroups = monitoredProxyGroupService.getAllEnabledConfigs();
@@ -44,7 +49,7 @@ public class ProxyMonitorService {
             return;
         }
 
-        log.debug("开始监控代理组延迟，共 {} 个代理组", enabledGroups.size());
+        log.debug("开始监控代理组延迟，共 {} 个代理组，检查间隔: {}ms", enabledGroups.size(), checkInterval);
 
         // 处理每个代理组
         for (MonitoredProxyGroup group : enabledGroups) {

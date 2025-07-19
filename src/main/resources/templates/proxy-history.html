@@ -2,8 +2,8 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: layout('代理延迟历史', ~{::div})}">
 <body>
     <div>
-        <!-- 引入Chart.js -->
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <!-- 引入ECharts -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
         
         <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
             <h1 class="h2" th:text="${config.groupName + ' 代理延迟历史'}">代理延迟历史</h1>
@@ -143,6 +143,9 @@
                 proxyStats = [];
                 const proxyNames = Object.keys(data.proxyDelays);
                 
+                // 处理时间数据，确保数据点均匀分布
+                processTimeData(data);
+                
                 for (const proxyName of proxyNames) {
                     const delayValues = data.proxyDelays[proxyName];
                     const stats = calculateStats(delayValues);
@@ -156,6 +159,63 @@
                         avgDelay: stats.avgDelay === 'N/A' ? 9999 : stats.avgDelay, // 用于排序
                         displayAvgDelay: stats.avgDelay
                     });
+                }
+            }
+
+            // 处理时间数据，确保数据点均匀分布
+            function processTimeData(data) {
+                if (!data.timeLabels || data.timeLabels.length === 0) return;
+                
+                // 将时间字符串转换为Date对象
+                const timeObjects = data.timeLabels.map(time => new Date(time));
+                
+                // 按时间排序
+                timeObjects.sort((a, b) => a - b);
+                
+                // 获取最早和最晚的时间
+                const earliestTime = timeObjects[0];
+                const latestTime = timeObjects[timeObjects.length - 1];
+                
+                // 计算总时间跨度（毫秒）
+                const timeSpan = latestTime - earliestTime;
+                
+                // 如果数据点过多，进行采样
+                const maxDataPoints = 24; // 最大数据点数量
+                if (timeObjects.length > maxDataPoints) {
+                    // 计算采样间隔
+                    const samplingInterval = Math.floor(timeObjects.length / maxDataPoints);
+                    
+                    // 创建新的时间标签和数据点
+                    const newTimeLabels = [];
+                    const newProxyDelays = {};
+                    
+                    // 初始化新的代理延迟数据结构
+                    for (const proxyName in data.proxyDelays) {
+                        newProxyDelays[proxyName] = [];
+                    }
+                    
+                    // 采样数据点
+                    for (let i = 0; i < timeObjects.length; i += samplingInterval) {
+                        newTimeLabels.push(data.timeLabels[i]);
+                        
+                        for (const proxyName in data.proxyDelays) {
+                            newProxyDelays[proxyName].push(data.proxyDelays[proxyName][i]);
+                        }
+                    }
+                    
+                    // 确保包含最后一个数据点
+                    const lastIndex = timeObjects.length - 1;
+                    if ((lastIndex % samplingInterval) !== 0) {
+                        newTimeLabels.push(data.timeLabels[lastIndex]);
+                        
+                        for (const proxyName in data.proxyDelays) {
+                            newProxyDelays[proxyName].push(data.proxyDelays[proxyName][lastIndex]);
+                        }
+                    }
+                    
+                    // 更新数据
+                    data.timeLabels = newTimeLabels;
+                    data.proxyDelays = newProxyDelays;
                 }
             }
             
@@ -290,10 +350,14 @@
                     return;
                 }
                 
-                // 销毁现有图表
+                // 清空现有图表
                 for (const chartId in charts) {
                     if (charts[chartId]) {
-                        charts[chartId].destroy();
+                        try {
+                            charts[chartId].dispose();
+                        } catch (e) {
+                            console.error(`销毁图表 ${chartId} 失败:`, e);
+                        }
                         charts[chartId] = null;
                     }
                 }
@@ -301,9 +365,13 @@
                 
                 // 准备时间标签
                 const timeLabels = chartData.timeLabels.map(time => {
-                    const date = new Date(time);
-                    return date.toLocaleString();
-                });
+                    try {
+                        return new Date(time).getTime(); // 转换为时间戳
+                    } catch (e) {
+                        console.error(`无效的时间格式: ${time}`, e);
+                        return null;
+                    }
+                }).filter(time => time !== null);
                 
                 // 为每个代理节点创建图表
                 for (const proxy of proxyStats) {
@@ -325,15 +393,12 @@
                     
                     const chartContainer = document.createElement('div');
                     chartContainer.className = 'chart-container';
-                    chartContainer.style.position = 'relative';
                     chartContainer.style.height = '300px';
                     chartContainer.style.width = '100%';
                     
-                    const canvas = document.createElement('canvas');
                     const chartId = `chart-${proxy.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
-                    canvas.id = chartId;
+                    chartContainer.id = chartId;
                     
-                    chartContainer.appendChild(canvas);
                     chartCardBody.appendChild(chartTitle);
                     chartCardBody.appendChild(chartContainer);
                     chartCard.appendChild(chartCardBody);
@@ -342,72 +407,159 @@
                     
                     chartsContainer.appendChild(chartRow);
                     
-                    // 创建图表
-                    const ctx = canvas.getContext('2d');
-                    charts[chartId] = createChart(ctx, timeLabels, proxy.delayValues, proxy.name);
+                    // 等待DOM更新后再创建图表
+                    setTimeout(() => {
+                        // 创建图表
+                        charts[chartId] = createEChart(chartId, timeLabels, proxy.delayValues, proxy.name);
+                    }, 50);
                 }
             }
             
-            // 创建单个图表
-            function createChart(ctx, labels, data, proxyName) {
-                const color = getRandomColor();
+            // 创建单个ECharts图表
+            function createEChart(chartId, timeLabels, delayValues, proxyName) {
+                // 确保容器存在且有尺寸
+                const container = document.getElementById(chartId);
+                if (!container) {
+                    console.error(`图表容器 ${chartId} 不存在`);
+                    return null;
+                }
                 
-                return new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: `${proxyName} 延迟`,
-                            data: data,
-                            borderColor: color,
-                            backgroundColor: color.replace('1)', '0.2)'),
-                            borderWidth: 2,
-                            pointRadius: 3,
-                            pointHoverRadius: 5,
-                            tension: 0.1,
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                title: {
-                                    display: true,
-                                    text: '延迟 (ms)'
-                                },
-                                ticks: {
-                                    callback: function(value) {
-                                        if (value < 0) return '未连通';
-                                        return value;
-                                    }
+                // 初始化图表前确保容器可见
+                container.style.height = '300px';
+                container.style.width = '100%';
+                
+                try {
+                    const chart = echarts.init(container);
+                    
+                    // 准备数据并过滤无效值
+                    const data = [];
+                    for (let i = 0; i < timeLabels.length; i++) {
+                        // 确保时间戳是有效的数字
+                        const time = Number(timeLabels[i]);
+                        if (isNaN(time)) {
+                            console.warn(`跳过无效时间戳: ${timeLabels[i]}`);
+                            continue;
+                        }
+                        data.push([time, delayValues[i]]);
+                    }
+                    
+                    // 如果数据为空，显示无数据提示
+                    if (data.length === 0) {
+                        container.innerHTML = '<div class="alert alert-warning">没有有效的数据点</div>';
+                        return null;
+                    }
+                    
+                    // 图表配置
+                    const option = {
+                        tooltip: {
+                            trigger: 'axis',
+                            formatter: function(params) {
+                                const time = new Date(params[0].value[0]).toLocaleString();
+                                const value = params[0].value[1];
+                                if (value < 0) {
+                                    return `${time}<br/>状态: 未连通`;
+                                } else {
+                                    return `${time}<br/>延迟: ${value}ms`;
                                 }
                             },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: '时间'
+                            axisPointer: {
+                                animation: false
+                            }
+                        },
+                        grid: {
+                            left: '3%',
+                            right: '4%',
+                            bottom: '3%',
+                            containLabel: true
+                        },
+                        xAxis: {
+                            type: 'time',
+                            splitLine: {
+                                show: false
+                            },
+                            axisLabel: {
+                                formatter: function(value) {
+                                    const date = new Date(value);
+                                    if (currentDays <= 1) {
+                                        return date.getHours() + ':' + String(date.getMinutes()).padStart(2, '0');
+                                    } else {
+                                        return (date.getMonth() + 1) + '-' + date.getDate() + ' ' + date.getHours() + ':' + String(date.getMinutes()).padStart(2, '0');
+                                    }
                                 }
                             }
                         },
-                        plugins: {
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const value = context.parsed.y;
-                                        if (value < 0) return '未连通';
-                                        return `延迟: ${value}ms`;
-                                    }
+                        yAxis: {
+                            type: 'value',
+                            name: '延迟 (ms)',
+                            axisLabel: {
+                                formatter: function(value) {
+                                    if (value < 0) return '未连通';
+                                    return value;
                                 }
                             },
-                            title: {
-                                display: false
+                            splitLine: {
+                                show: true
                             }
+                        },
+                        series: [{
+                            name: `${proxyName} 延迟`,
+                            type: 'line',
+                            showSymbol: true,
+                            data: data,
+                            lineStyle: {
+                                width: 2
+                            },
+                            itemStyle: {
+                                color: getRandomColor()
+                            },
+                            areaStyle: {
+                                color: {
+                                    type: 'linear',
+                                    x: 0,
+                                    y: 0,
+                                    x2: 0,
+                                    y2: 1,
+                                    colorStops: [{
+                                        offset: 0,
+                                        color: getRandomColor().replace('1)', '0.5)')
+                                    }, {
+                                        offset: 1,
+                                        color: getRandomColor().replace('1)', '0.05)')
+                                    }]
+                                }
+                            },
+                            markLine: {
+                                silent: true,
+                                data: [{
+                                    yAxis: 0,
+                                    lineStyle: {
+                                        color: '#999',
+                                        type: 'dashed'
+                                    },
+                                    label: {
+                                        show: false
+                                    }
+                                }]
+                            }
+                        }]
+                    };
+                    
+                    // 设置图表配置
+                    chart.setOption(option);
+                    
+                    // 响应式调整
+                    window.addEventListener('resize', function() {
+                        if (chart && !chart.isDisposed()) {
+                            chart.resize();
                         }
-                    }
-                });
+                    });
+                    
+                    return chart;
+                } catch (error) {
+                    console.error(`创建图表 ${chartId} 失败:`, error);
+                    container.innerHTML = `<div class="alert alert-danger">图表加载失败: ${error.message}</div>`;
+                    return null;
+                }
             }
             
             // 获取随机颜色
