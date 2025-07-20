@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * 代理节点延迟历史记录实体类
@@ -62,7 +63,7 @@ public class ProxyDelayHistory {
         history.setGroupName(groupName);
         history.setProxyName(proxyName);
         history.setDelay(delay);
-        history.setTestTime(LocalDateTime.now());
+        history.setTestTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
         return history;
     }
 } 

@@ -286,7 +286,10 @@
                     tooltip: {
                         trigger: 'axis',
                         formatter: function(params) {
-                            const time = new Date(params[0].value[0]).toLocaleString();
+                            // 转换为中国时区显示
+                            const date = new Date(params[0].value[0]);
+                            const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
+                            const time = chinaTime.toLocaleString('zh-CN');
                             const value = params[0].value[1];
                             if (value < 0) {
                                 return `${time}<br/>状态: 未连通`;
@@ -314,10 +317,11 @@
                         axisLabel: {
                             formatter: function(value) {
                                 const date = new Date(value);
+                                const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
                                 if (currentDays <= 1) {
-                                    return date.getHours() + ':' + String(date.getMinutes()).padStart(2, '0');
+                                    return chinaTime.getHours() + ':' + String(chinaTime.getMinutes()).padStart(2, '0');
                                 } else {
-                                    return (date.getMonth() + 1) + '-' + date.getDate() + ' ' + date.getHours() + ':' + String(date.getMinutes()).padStart(2, '0');
+                                    return (chinaTime.getMonth() + 1) + '-' + chinaTime.getDate() + ' ' + chinaTime.getHours() + ':' + String(chinaTime.getMinutes()).padStart(2, '0');
                                 }
                             }
                         }
@@ -374,7 +378,10 @@
                     tooltip: {
                         trigger: 'axis',
                         formatter: function(params) {
-                            const time = new Date(params[0].value[0]).toLocaleString();
+                            // 转换为中国时区显示
+                            const date = new Date(params[0].value[0]);
+                            const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
+                            const time = chinaTime.toLocaleString('zh-CN');
                             const status = params[0].value[1] === 1 ? '连通' : '未连通';
                             return `${time}<br/>状态: ${status}`;
                         }
@@ -390,10 +397,11 @@
                         axisLabel: {
                             formatter: function(value) {
                                 const date = new Date(value);
+                                const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
                                 if (currentDays <= 1) {
-                                    return date.getHours() + ':' + String(date.getMinutes()).padStart(2, '0');
+                                    return chinaTime.getHours() + ':' + String(chinaTime.getMinutes()).padStart(2, '0');
                                 } else {
-                                    return (date.getMonth() + 1) + '-' + date.getDate() + ' ' + date.getHours() + ':' + String(date.getMinutes()).padStart(2, '0');
+                                    return (chinaTime.getMonth() + 1) + '-' + chinaTime.getDate() + ' ' + chinaTime.getHours() + ':' + String(chinaTime.getMinutes()).padStart(2, '0');
                                 }
                             }
                         }
@@ -516,14 +524,17 @@
                 // 按日期分组计算平均延迟
                 const dailyData = {};
                 data.timeLabels.forEach((time, index) => {
-                    const date = new Date(time).toDateString();
+                    // 转换为中国时区
+                    const date = new Date(time);
+                    const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
+                    const dateString = chinaTime.toDateString();
                     const delay = data.delayValues[index];
                     
-                    if (!dailyData[date]) {
-                        dailyData[date] = [];
+                    if (!dailyData[dateString]) {
+                        dailyData[dateString] = [];
                     }
                     if (delay >= 0) {
-                        dailyData[date].push(delay);
+                        dailyData[dateString].push(delay);
                     }
                 });
                 
@@ -536,9 +547,12 @@
                     tooltip: {
                         trigger: 'axis',
                         formatter: function(params) {
-                            const date = new Date(params[0].value[0]).toDateString();
+                            // 转换为中国时区显示
+                            const date = new Date(params[0].value[0]);
+                            const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
+                            const dateString = chinaTime.toDateString();
                             const avgDelay = params[0].value[1];
-                            return `${date}<br/>平均延迟: ${avgDelay}ms`;
+                            return `${dateString}<br/>平均延迟: ${avgDelay}ms`;
                         }
                     },
                     grid: {
@@ -552,7 +566,8 @@
                         axisLabel: {
                             formatter: function(value) {
                                 const date = new Date(value);
-                                return (date.getMonth() + 1) + '-' + date.getDate();
+                                const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
+                                return (chinaTime.getMonth() + 1) + '-' + chinaTime.getDate();
                             }
                         }
                     },
@@ -584,13 +599,30 @@
                     return;
                 }
                 
+                // 创建倒序索引数组，最新的数据在前面
+                const totalLength = nodeData.timeLabels.length;
                 const startIndex = (page - 1) * pageSize;
-                const endIndex = Math.min(startIndex + pageSize, nodeData.timeLabels.length);
+                const endIndex = Math.min(startIndex + pageSize, totalLength);
                 
                 let tableRows = '';
                 for (let i = startIndex; i < endIndex; i++) {
-                    const time = new Date(nodeData.timeLabels[i]).toLocaleString();
-                    const delay = nodeData.delayValues[i];
+                    // 使用倒序索引：最新的数据（最大索引）排在前面
+                    const reverseIndex = totalLength - 1 - i;
+                    
+                    // 将时间转换为中国时区显示
+                    const timeString = nodeData.timeLabels[reverseIndex];
+                    const date = new Date(timeString);
+                    const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
+                    const time = chinaTime.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                    
+                    const delay = nodeData.delayValues[reverseIndex];
                     const status = delay >= 0 ? '连通' : '未连通';
                     const delayText = delay >= 0 ? delay + 'ms' : '-';
                     const statusClass = delay >= 0 ? 'text-success' : 'text-danger';

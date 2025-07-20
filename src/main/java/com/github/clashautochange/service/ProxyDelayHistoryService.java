@@ -89,7 +89,7 @@ public class ProxyDelayHistoryService {
      */
     public List<ProxyDelayHistory> getHistoriesByProxyNameAndTimeRange(
             String groupName, String proxyName, LocalDateTime startTime, LocalDateTime endTime) {
-        return proxyDelayHistoryRepository.findByGroupNameAndProxyNameAndTestTimeBetweenOrderByTestTimeAsc(
+        return proxyDelayHistoryRepository.findByGroupNameAndProxyNameAndTestTimeBetweenOrderByTestTimeDesc(
                 groupName, proxyName, startTime, endTime);
     }
 
@@ -166,6 +166,6 @@ public class ProxyDelayHistoryService {
     }
 
     public List<ProxyDelayHistory> findByGroupNameAndProxyNameAndTimeRange(String groupName, String proxyName, LocalDateTime startTime, LocalDateTime endTime) {
-        return proxyDelayHistoryRepository.findByGroupNameAndProxyNameAndTestTimeBetween(groupName, proxyName, startTime, endTime);
+        return proxyDelayHistoryRepository.findByGroupNameAndProxyNameAndTestTimeBetweenOrderByTestTimeDesc(groupName, proxyName, startTime, endTime);
     }
 } 

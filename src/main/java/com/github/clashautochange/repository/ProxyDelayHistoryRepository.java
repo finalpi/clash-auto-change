@@ -76,4 +76,16 @@ public interface ProxyDelayHistoryRepository extends JpaRepository<ProxyDelayHis
     List<ProxyDelayHistory> findByGroupNameAndTestTimeBetween(String groupName, LocalDateTime startTime, LocalDateTime endTime);
 
     List<ProxyDelayHistory> findByGroupNameAndProxyNameAndTestTimeBetween(String groupName, String proxyName, LocalDateTime startTime, LocalDateTime endTime);
+
+    /**
+     * 查找指定时间范围内特定代理节点的历史记录（按时间倒序）
+     *
+     * @param groupName 代理组名称
+     * @param proxyName 代理节点名称
+     * @param startTime 开始时间
+     * @param endTime 结束时间
+     * @return 代理延迟历史记录列表
+     */
+    List<ProxyDelayHistory> findByGroupNameAndProxyNameAndTestTimeBetweenOrderByTestTimeDesc(
+            String groupName, String proxyName, LocalDateTime startTime, LocalDateTime endTime);
 }

@@ -94,6 +94,13 @@ public class ProxyMonitorService {
             List<ProxyDelayHistory> histories = new ArrayList<>();
             for (String proxy : proxies) {
                 Integer delay = delayResults.getOrDefault(proxy, -1); // 默认为-1表示未连通
+                
+                // 如果延迟大于4000ms，视为离线状态
+                if (delay != null && delay > 4000) {
+                    delay = -1;
+                    log.debug("代理节点: {} 延迟过高 (>4000ms)，记录为离线状态", proxy);
+                }
+                
                 ProxyDelayHistory history = ProxyDelayHistory.create(groupName, proxy, delay);
                 histories.add(history);
 
