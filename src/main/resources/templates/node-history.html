@@ -278,8 +278,25 @@
                 
                 const chart = echarts.init(document.getElementById('trendChart'));
                 
-                const chartData = data.timeLabels.map((time, index) => {
-                    return [new Date(time).getTime(), data.delayValues[index]];
+                // 分离连通和断线的数据点
+                const connectedData = [];
+                const disconnectedData = [];
+                
+                data.timeLabels.forEach((time, index) => {
+                    const timestamp = new Date(time).getTime();
+                    const delay = data.delayValues[index];
+                    
+                    if (delay >= 0) {
+                        // 连通的数据点
+                        connectedData.push([timestamp, delay]);
+                        // 为断线数据添加null占位，保持连续性
+                        disconnectedData.push([timestamp, null]);
+                    } else {
+                        // 断线的数据点，显示为0但标红
+                        disconnectedData.push([timestamp, 0]);
+                        // 为连通数据添加null占位，保持连续性
+                        connectedData.push([timestamp, null]);
+                    }
                 });
                 
                 const option = {
@@ -290,11 +307,16 @@
                             const date = new Date(params[0].value[0]);
                             const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
                             const time = chinaTime.toLocaleString('zh-CN');
-                            const value = params[0].value[1];
-                            if (value < 0) {
+                            
+                            // 查找原始延迟值
+                            const timestamp = params[0].value[0];
+                            const timeIndex = data.timeLabels.findIndex(t => new Date(t).getTime() === timestamp);
+                            const originalDelay = timeIndex >= 0 ? data.delayValues[timeIndex] : null;
+                            
+                            if (originalDelay < 0) {
                                 return `${time}<br/>状态: 未连通`;
                             } else {
-                                return `${time}<br/>延迟: ${value}ms`;
+                                return `${time}<br/>延迟: ${originalDelay}ms`;
                             }
                         }
                     },
@@ -316,6 +338,7 @@
                         type: 'time',
                         axisLabel: {
                             formatter: function(value) {
+                                // 转换为中国时区
                                 const date = new Date(value);
                                 const chinaTime = new Date(date.toLocaleString("en-US", {timeZone: "Asia/Shanghai"}));
                                 if (currentDays <= 1) {
@@ -331,29 +354,44 @@
                         name: '延迟 (ms)',
                         axisLabel: {
                             formatter: function(value) {
-                                if (value < 0) return '未连通';
                                 return value;
                             }
                         }
                     },
                     series: [{
-                        name: '延迟',
+                        name: '连通延迟',
                         type: 'line',
-                        data: chartData,
+                        data: connectedData,
+                        showSymbol: false,
                         lineStyle: {
                             width: 2,
-                            color: '#5470c6'
+                            color: '#1890ff'
                         },
                         areaStyle: {
                             color: {
                                 type: 'linear',
                                 x: 0, y: 0, x2: 0, y2: 1,
                                 colorStops: [{
-                                    offset: 0, color: 'rgba(84, 112, 198, 0.5)'
+                                    offset: 0, color: 'rgba(24, 144, 255, 0.3)'
                                 }, {
-                                    offset: 1, color: 'rgba(84, 112, 198, 0.05)'
+                                    offset: 1, color: 'rgba(24, 144, 255, 0.05)'
                                 }]
                             }
+                        }
+                    }, {
+                        name: '断线状态',
+                        type: 'line',
+                        data: disconnectedData,
+                        showSymbol: true,
+                        symbolSize: 6,
+                        lineStyle: {
+                            width: 0,  // 不显示连线
+                            color: 'transparent'
+                        },
+                        itemStyle: {
+                            color: '#ff4d4f',  // 红色圆点
+                            borderColor: '#ff4d4f',
+                            borderWidth: 2
                         }
                     }]
                 };
