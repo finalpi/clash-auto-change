@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -19,6 +20,9 @@ import java.util.stream.Collectors;
 public class ProxyDelayHistoryService {
 
     private final ProxyDelayHistoryRepository proxyDelayHistoryRepository;
+    
+    // 中国时区常量
+    private static final ZoneId CHINA_ZONE = ZoneId.of("Asia/Shanghai");
 
     @Autowired
     public ProxyDelayHistoryService(ProxyDelayHistoryRepository proxyDelayHistoryRepository) {
@@ -100,7 +104,7 @@ public class ProxyDelayHistoryService {
      * @return 历史记录列表
      */
     public List<ProxyDelayHistory> getLast7DaysHistories(String groupName) {
-        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime endTime = LocalDateTime.now(CHINA_ZONE);
         LocalDateTime startTime = endTime.minusDays(7);
         return getHistoriesByTimeRange(groupName, startTime, endTime);
     }
@@ -157,7 +161,7 @@ public class ProxyDelayHistoryService {
     @Scheduled(cron = "0 0 0 * * ?") // 每天零点执行
     @Transactional
     public void cleanupOldHistories() {
-        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now(CHINA_ZONE).minusDays(30);
         long deletedCount = proxyDelayHistoryRepository.deleteByTestTimeBefore(thirtyDaysAgo);
     }
 

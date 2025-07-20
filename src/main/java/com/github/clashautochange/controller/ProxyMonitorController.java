@@ -6,6 +6,9 @@ import com.github.clashautochange.service.ClashApiService;
 import com.github.clashautochange.service.MonitoredProxyGroupService;
 import com.github.clashautochange.service.ProxyDelayHistoryService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -13,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -31,6 +35,9 @@ public class ProxyMonitorController {
     private final MonitoredProxyGroupService monitoredProxyGroupService;
     private final ProxyDelayHistoryService proxyDelayHistoryService;
     private final ClashApiService clashApiService;
+
+    // 中国时区常量
+    private static final ZoneId CHINA_ZONE = ZoneId.of("Asia/Shanghai");
 
     @Autowired
     public ProxyMonitorController(
@@ -171,7 +178,7 @@ public class ProxyMonitorController {
             @RequestParam(required = false) String proxyName,
             @RequestParam(required = false) Integer days) {
         
-        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime endTime = LocalDateTime.now(CHINA_ZONE);
         LocalDateTime startTime = endTime.minusDays(days != null ? days : 7);
         
         List<ProxyDelayHistory> histories;
@@ -209,7 +216,7 @@ public class ProxyMonitorController {
                                                   @RequestParam(defaultValue = "7") int days) {
         
         // 计算时间范围
-        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime endTime = LocalDateTime.now(CHINA_ZONE);
         LocalDateTime startTime = endTime.minusDays(days);
         
         // 获取延迟历史数据
@@ -245,7 +252,7 @@ public class ProxyMonitorController {
     public ResponseEntity<Map<String, Object>> getProxyStats(@PathVariable String groupName,
                                                          @RequestParam(defaultValue = "7") int days) {
         
-        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime endTime = LocalDateTime.now(CHINA_ZONE);
         LocalDateTime startTime = endTime.minusDays(days);
         
         // 获取该代理组的所有历史记录
