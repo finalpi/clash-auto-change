@@ -116,9 +116,27 @@ public class WebController {
             model.addAttribute("configs", configs);
             
             // 获取可用的策略组列表
+            Map<String, List<String>> availableGroups = Collections.emptyMap();
+            Map<String, String> currentProxies = new HashMap<>();
+            
             try {
-                Map<String, List<String>> availableGroups = clashApiService.getAllGroups();
+                availableGroups = clashApiService.getAllGroups();
                 model.addAttribute("availableGroups", availableGroups);
+                
+                // 获取每个策略组当前选择的节点
+                for (ProxyGroupConfig config : configs) {
+                    try {
+                        Map<String, Object> groupInfo = clashApiService.getGroupInfo(config.getGroupName());
+                        if (groupInfo != null && groupInfo.containsKey("now")) {
+                            String currentProxy = (String) groupInfo.get("now");
+                            currentProxies.put(config.getGroupName(), currentProxy);
+                        }
+                    } catch (Exception e) {
+                        log.warn("获取策略组 {} 当前选择节点失败: {}", config.getGroupName(), e.getMessage());
+                        currentProxies.put(config.getGroupName(), "获取失败");
+                    }
+                }
+                
             } catch (ResourceAccessException e) {
                 log.error("无法连接到Clash API", e);
                 model.addAttribute("error", "无法连接到Clash API，请检查API设置和Clash状态");
@@ -129,12 +147,14 @@ public class WebController {
                 model.addAttribute("availableGroups", Collections.emptyMap());
             }
             
+            model.addAttribute("currentProxies", currentProxies);
             model.addAttribute("newConfig", new ProxyGroupConfig());
         } catch (Exception e) {
             log.error("加载策略组配置页面失败", e);
             model.addAttribute("error", "加载策略组配置页面失败: " + e.getMessage());
             model.addAttribute("configs", Collections.emptyList());
             model.addAttribute("availableGroups", Collections.emptyMap());
+            model.addAttribute("currentProxies", Collections.emptyMap());
             model.addAttribute("newConfig", new ProxyGroupConfig());
         }
         return "proxy-groups";

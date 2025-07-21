@@ -68,16 +68,20 @@
                     console.log('使用前缀:', prefix);
                     
                     // 修正ID大小写问题
-                    let groupSelectId, proxySelectId, statusDivId;
+                    let groupSelectId, proxySelectId, statusDivId, testUrlId, timeoutId;
                     
                     if (prefix === 'edit') {
                         groupSelectId = 'editGroupName';
                         proxySelectId = 'editPreferredProxy';
                         statusDivId = 'editProxyLoadingStatus';
+                        testUrlId = 'editTestUrl';
+                        timeoutId = 'editTimeout';
                     } else {
                         groupSelectId = 'groupName';
                         proxySelectId = 'preferredProxy';
                         statusDivId = 'proxyLoadingStatus';
+                        testUrlId = 'testUrl';
+                        timeoutId = 'timeout';
                     }
                     
                     console.log('尝试获取DOM元素:', groupSelectId, proxySelectId, statusDivId);
@@ -85,6 +89,8 @@
                     const groupSelect = document.getElementById(groupSelectId);
                     const proxySelect = document.getElementById(proxySelectId);
                     const statusDiv = document.getElementById(statusDivId);
+                    const testUrlInput = document.getElementById(testUrlId);
+                    const timeoutInput = document.getElementById(timeoutId);
                     
                     console.log('DOM元素获取结果:', 
                         groupSelect ? '策略组选择框-已找到' : '策略组选择框-未找到', 
@@ -114,7 +120,9 @@
                     
                     console.log('加载策略组的代理节点:', selectedGroup);
                     proxySelect.innerHTML = '<option value="">-- 加载中... --</option>';
-                    statusDiv.textContent = '正在加载代理节点...';
+                    proxySelect.disabled = true; // 禁用选择框
+                    statusDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>正在加载代理节点...';
+                    statusDiv.style.color = '#6c757d';
                     
                     const apiUrl = `/api/config/group-proxies/${encodeURIComponent(selectedGroup)}?_=${new Date().getTime()}`;
                     console.log('请求API:', apiUrl);
@@ -132,31 +140,280 @@
                             proxySelect.innerHTML = '<option value="">-- 选择优先节点 --</option>';
                             
                             if (Array.isArray(proxies) && proxies.length > 0) {
+                                // 先添加节点选项，不显示延迟
                                 proxies.forEach(proxy => {
                                     const option = document.createElement('option');
                                     option.value = proxy;
                                     option.textContent = proxy;
                                     proxySelect.appendChild(option);
                                 });
-                                statusDiv.textContent = `已加载 ${proxies.length} 个代理节点`;
+                                statusDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>正在测试延迟...';
+                                
+                                // 然后测试延迟
+                                testProxyDelays(selectedGroup, testUrlInput, timeoutInput, proxySelect, statusDiv);
                             } else {
-                                statusDiv.textContent = '未找到代理节点';
+                                proxySelect.disabled = false; // 重新启用选择框
+                                statusDiv.innerHTML = '未找到代理节点';
+                                statusDiv.style.color = '#dc3545';
                             }
                         })
                         .catch(error => {
                             console.error('获取代理节点出错:', error);
                             proxySelect.innerHTML = '<option value="">-- 无法获取代理节点 --</option>';
-                            statusDiv.textContent = `错误: ${error.message}`;
+                            proxySelect.disabled = false; // 重新启用选择框
+                            statusDiv.innerHTML = `错误: ${error.message}`;
+                            statusDiv.style.color = '#dc3545';
                         });
                 } catch (error) {
                     console.error('loadProxies函数执行出错:', error);
                 }
+            }
+            
+            // 测试代理延迟的函数
+            function testProxyDelays(groupName, testUrlInput, timeoutInput, proxySelect, statusDiv) {
+                // 获取测试参数
+                const testUrl = testUrlInput ? testUrlInput.value : 'https://www.gstatic.com/generate_204';
+                const timeout = timeoutInput ? timeoutInput.value : '5000';
+                
+                const delayApiUrl = `/api/config/group-delays/${encodeURIComponent(groupName)}?testUrl=${encodeURIComponent(testUrl)}&timeout=${timeout}&_=${new Date().getTime()}`;
+                console.log('测试延迟API:', delayApiUrl);
+                
+                // 在测试延迟期间禁用选择框
+                proxySelect.disabled = true;
+                
+                fetch(delayApiUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`延迟测试API请求失败: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(delays => {
+                        console.log('获取到延迟数据:', delays);
+                        
+                        if (delays.error) {
+                            statusDiv.innerHTML = '延迟测试失败';
+                            statusDiv.style.color = '#dc3545';
+                            proxySelect.disabled = false; // 重新启用选择框
+                            return;
+                        }
+                        
+                        // 记住当前选中的值
+                        const currentSelected = proxySelect.value;
+                        
+                        // 重新构建选项，包含延迟信息
+                        proxySelect.innerHTML = '<option value="">-- 选择优先节点 --</option>';
+                        
+                        // 按延迟排序（连通的节点在前，断线的在后）
+                        const sortedProxies = Object.entries(delays).sort((a, b) => {
+                            const [, delayA] = a;
+                            const [, delayB] = b;
+                            
+                            // 断线的节点排在后面
+                            if (delayA < 0 && delayB >= 0) return 1;
+                            if (delayA >= 0 && delayB < 0) return -1;
+                            if (delayA < 0 && delayB < 0) return 0;
+                            
+                            // 两个都连通的，按延迟升序排列
+                            return delayA - delayB;
+                        });
+                        
+                        // 添加带延迟信息的选项
+                        let connectedCount = 0;
+                        let offlineCount = 0;
+                        sortedProxies.forEach(([proxy, delay]) => {
+                            const option = document.createElement('option');
+                            option.value = proxy;
+                            
+                            let delayText = '';
+                            let statusColor = '';
+                            if (delay < 0) {
+                                delayText = ' (离线)';
+                                statusColor = 'color: #dc3545; font-weight: bold;'; // 红色加粗
+                                offlineCount++;
+                            } else {
+                                delayText = ` (${delay}ms)`;
+                                connectedCount++;
+                                if (delay <= 100) {
+                                    statusColor = 'color: #28a745; font-weight: bold;'; // 绿色加粗
+                                } else if (delay <= 300) {
+                                    statusColor = 'color: #ffc107; font-weight: bold;'; // 黄色加粗
+                                } else {
+                                    statusColor = 'color: #fd7e14; font-weight: bold;'; // 橙色加粗
+                                }
+                            }
+                            
+                            option.textContent = proxy + delayText;
+                            option.style.cssText = statusColor;
+                            proxySelect.appendChild(option);
+                        });
+                        
+                        // 恢复之前选中的值
+                        if (currentSelected) {
+                            proxySelect.value = currentSelected;
+                        }
+                        
+                        // 重新启用选择框
+                        proxySelect.disabled = false;
+                        
+                        statusDiv.innerHTML = `已加载 ${sortedProxies.length} 个代理节点，${connectedCount} 个连通，${offlineCount} 个离线`;
+                        statusDiv.style.color = connectedCount > 0 ? '#28a745' : '#dc3545';
+                    })
+                    .catch(error => {
+                        console.error('测试延迟出错:', error);
+                        statusDiv.innerHTML = `延迟测试失败: ${error.message}`;
+                        statusDiv.style.color = '#dc3545';
+                        proxySelect.disabled = false; // 重新启用选择框
+                    });
+            }
+            
+            // 刷新延迟的函数
+            function refreshDelays(mode = 'add') {
+                console.log('手动刷新延迟，模式:', mode);
+                
+                const prefix = mode === 'edit' ? 'edit' : '';
+                const groupSelectId = prefix === 'edit' ? 'editGroupName' : 'groupName';
+                const proxySelectId = prefix === 'edit' ? 'editPreferredProxy' : 'preferredProxy';
+                const statusDivId = prefix === 'edit' ? 'editProxyLoadingStatus' : 'proxyLoadingStatus';
+                const testUrlId = prefix === 'edit' ? 'editTestUrl' : 'testUrl';
+                const timeoutId = prefix === 'edit' ? 'editTimeout' : 'timeout';
+                
+                const groupSelect = document.getElementById(groupSelectId);
+                const proxySelect = document.getElementById(proxySelectId);
+                const statusDiv = document.getElementById(statusDivId);
+                const testUrlInput = document.getElementById(testUrlId);
+                const timeoutInput = document.getElementById(timeoutId);
+                
+                if (!groupSelect || !proxySelect || !statusDiv) {
+                    console.error('找不到必要的DOM元素');
+                    return;
+                }
+                
+                const selectedGroup = groupSelect.value;
+                if (!selectedGroup) {
+                    statusDiv.innerHTML = '请先选择策略组';
+                    statusDiv.style.color = '#dc3545';
+                    return;
+                }
+                
+                statusDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>正在刷新延迟...';
+                statusDiv.style.color = '#6c757d';
+                
+                // 直接测试延迟，不重新加载代理列表
+                testProxyDelays(selectedGroup, testUrlInput, timeoutInput, proxySelect, statusDiv);
+            }
+            
+            // 刷新所有策略组当前选择节点的函数
+            function refreshCurrentProxies() {
+                console.log('开始刷新当前选择节点');
+                
+                // 找到刷新按钮并显示加载状态
+                const refreshBtn = document.querySelector('button[onclick="refreshCurrentProxies()"]');
+                if (refreshBtn) {
+                    const originalHtml = refreshBtn.innerHTML;
+                    refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>刷新中...';
+                    refreshBtn.disabled = true;
+                    
+                    // 恢复按钮状态的函数
+                    const restoreButton = () => {
+                        refreshBtn.innerHTML = originalHtml;
+                        refreshBtn.disabled = false;
+                    };
+                    
+                    fetch('/api/config/current-proxies?_=' + new Date().getTime())
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`API请求失败: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(currentProxies => {
+                            console.log('获取到当前选择节点:', currentProxies);
+                            
+                            if (currentProxies.error) {
+                                throw new Error(currentProxies.error);
+                            }
+                            
+                            // 更新表格中的当前选择列
+                            updateCurrentProxyColumns(currentProxies);
+                            
+                            // 显示成功提示
+                            showToast('当前选择节点已刷新', 'success');
+                            
+                            restoreButton();
+                        })
+                        .catch(error => {
+                            console.error('刷新当前选择节点失败:', error);
+                            showToast('刷新失败: ' + error.message, 'error');
+                            restoreButton();
+                        });
+                }
+            }
+            
+            // 更新表格中当前选择列的函数
+            function updateCurrentProxyColumns(currentProxies) {
+                // 获取所有配置行
+                const configRows = document.querySelectorAll('tbody tr:not(.empty-row)');
+                
+                configRows.forEach(row => {
+                    const groupNameCell = row.querySelector('td:nth-child(2)');
+                    const preferredProxyCell = row.querySelector('td:nth-child(3)');
+                    const currentProxyCell = row.querySelector('td:nth-child(4)');
+                    
+                    if (groupNameCell && preferredProxyCell && currentProxyCell) {
+                        const groupName = groupNameCell.textContent.trim();
+                        const preferredProxy = preferredProxyCell.textContent.trim();
+                        const currentProxy = currentProxies[groupName];
+                        
+                        if (currentProxy) {
+                            let badgeClass = '';
+                            if (currentProxy === 'error' || currentProxy === '获取失败') {
+                                badgeClass = 'badge bg-danger';
+                            } else if (currentProxy === preferredProxy) {
+                                badgeClass = 'badge bg-success';
+                            } else {
+                                badgeClass = 'badge bg-warning';
+                            }
+                            
+                            currentProxyCell.innerHTML = `<span class="${badgeClass}">${currentProxy}</span>`;
+                        } else {
+                            currentProxyCell.innerHTML = '<span class="badge bg-secondary">未知</span>';
+                        }
+                    }
+                });
+            }
+            
+            // 显示提示消息的函数
+            function showToast(message, type = 'info') {
+                // 创建提示元素
+                const toast = document.createElement('div');
+                toast.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} alert-dismissible fade show`;
+                toast.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+                toast.innerHTML = `
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                
+                document.body.appendChild(toast);
+                
+                // 3秒后自动移除
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.remove();
+                    }
+                }, 3000);
             }
         </script>
         
         <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
             <h1 class="h2">策略组配置</h1>
             <div class="btn-toolbar mb-2 mb-md-0">
+                <div class="btn-group me-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="refreshCurrentProxies()" title="刷新当前选择">
+                        <span data-feather="refresh-cw"></span>
+                        刷新当前选择
+                    </button>
+                </div>
                 <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addConfigModal">
                     <span data-feather="plus"></span>
                     添加配置
@@ -172,6 +429,7 @@
                         <th>ID</th>
                         <th>策略组</th>
                         <th>优先节点</th>
+                        <th>当前选择</th>
                         <th>测试URL</th>
                         <th>超时(ms)</th>
                         <th>最大延迟(ms)</th>
@@ -182,12 +440,18 @@
                 </thead>
                 <tbody>
                     <tr th:if="${configs.empty}">
-                        <td colspan="9" class="text-center">暂无配置</td>
+                        <td colspan="10" class="text-center">暂无配置</td>
                     </tr>
                     <tr th:each="config : ${configs}">
                         <td th:text="${config.id}">1</td>
                         <td th:text="${config.groupName}">Proxy</td>
                         <td th:text="${config.preferredProxy}">HK01</td>
+                        <td>
+                            <span th:if="${currentProxies.containsKey(config.groupName)}" 
+                                  th:text="${currentProxies.get(config.groupName)}"
+                                  th:class="${currentProxies.get(config.groupName) == config.preferredProxy ? 'badge bg-success' : 'badge bg-warning'}">当前节点</span>
+                            <span th:unless="${currentProxies.containsKey(config.groupName)}" class="badge bg-secondary">未知</span>
+                        </td>
                         <td th:text="${config.testUrl}">https://www.gstatic.com/generate_204</td>
                         <td th:text="${config.timeout}">5000</td>
                         <td th:text="${config.maxDelay}">500</td>
@@ -244,9 +508,14 @@
                             </div>
                             <div class="mb-3">
                                 <label for="preferredProxy" class="form-label">优先节点</label>
-                                <select class="form-select" id="preferredProxy" name="preferredProxy" required>
-                                    <option value="">-- 请先选择策略组 --</option>
-                                </select>
+                                <div class="input-group">
+                                    <select class="form-select" id="preferredProxy" name="preferredProxy" required>
+                                        <option value="">-- 请先选择策略组 --</option>
+                                    </select>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="refreshDelays('add')" title="刷新延迟">
+                                        <span data-feather="refresh-cw"></span>
+                                    </button>
+                                </div>
                                 <div id="proxyLoadingStatus" class="form-text text-info"></div>
                             </div>
                             <div class="mb-3">
@@ -299,9 +568,14 @@
                             </div>
                             <div class="mb-3">
                                 <label for="editPreferredProxy" class="form-label">优先节点</label>
-                                <select class="form-select" id="editPreferredProxy" name="preferredProxy" required>
-                                    <option value="">-- 请先选择策略组 --</option>
-                                </select>
+                                <div class="input-group">
+                                    <select class="form-select" id="editPreferredProxy" name="preferredProxy" required>
+                                        <option value="">-- 请先选择策略组 --</option>
+                                    </select>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="refreshDelays('edit')" title="刷新延迟">
+                                        <span data-feather="refresh-cw"></span>
+                                    </button>
+                                </div>
                                 <div id="editProxyLoadingStatus" class="form-text text-info"></div>
                             </div>
                             <div class="mb-3">
